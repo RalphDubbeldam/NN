@@ -11,6 +11,7 @@ allowing you to easily modify hyperparameters using a command-line argument pars
    This ensures proper execution when the script is run directly.
 
 Feel free to customize the script as needed for your use case.
+test
 """
 import os
 from argparse import ArgumentParser
@@ -30,7 +31,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet import UNet
+from unet import Model
 
 
 # Mapping class IDs to train IDs
