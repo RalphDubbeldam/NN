@@ -51,11 +51,11 @@ class DecoderBlock(nn.Module):
         return output
     
     
-class UNet(nn.Module):
+class Model(nn.Module):
     def __init__(self, input_features=3,num_classes=16, pretrained=True,
                 layer1_features=32, layer2_features=16,
                 layer3_features=24, layer4_features=40, layer5_features=80):
-        super(UNet, self).__init__()
+        super(Model, self).__init__()
         self.effnet = models.efficientnet_b0(pretrained=pretrained)
 
         self.num_classes = num_classes
