@@ -1,0 +1,16 @@
+{
+  "os":  "Windows-10-10.0.19045-SP0",
+  "python":  "CPython 3.12.9",
+  "startedAt":  "2025-03-20T10:19:35.679956Z",
+  "program":  "c:\\Users\\20193857\\Documents\\Visual_Studio_2017\\NeuralNetworks\\NNCV\\Final assignment\\train.py",
+  "codePath":  "Final assignment\\train.py",
+  "git":  {
+    "remote":  "https://github.com/RalphDubbeldam/NN",
+    "commit":  "86d026711af4d3ea5412d6e31edd9f32461bef07"
+  },
+  "email":  "ralphdubbeldam@gmail.com",
+  "root":  "C:\\Users\\20193857\\Documents\\Visual_Studio_2017\\NeuralNetworks\\NNCV",
+  "host":  "20193857",
+  "executable":  "C:\\Users\\20193857\\Documents\\Visual_Studio_2017\\NeuralNetworks\\NNCV\\Neural\\Scripts\\python.exe",
+  "codePathLocal":  "Final assignment\\train.py"
+}
