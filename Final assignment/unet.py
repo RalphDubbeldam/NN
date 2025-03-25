@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
+# https://medium.com/@oleg.belkovskiy/enhancing-unet-tailoring-superior-segmentation-models-through-transfer-learning-8323a519b877  
+
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels):
         super().__init__()
@@ -52,7 +54,7 @@ class DecoderBlock(nn.Module):
     
     
 class Model(nn.Module):
-    def __init__(self, input_features=3,num_classes=16, pretrained=True,
+    def __init__(self, input_features=3,num_classes=19, pretrained=True,
                 layer1_features=32, layer2_features=16,
                 layer3_features=24, layer4_features=40, layer5_features=80):
         super(Model, self).__init__()

@@ -31,7 +31,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline import Model
+from unet import Model
 
 
 # Mapping class IDs to train IDs
@@ -133,8 +133,8 @@ def main(args):
 
     # Define the model
     model = Model(
-        in_channels=3,  # RGB images
-        n_classes=19,  # 19 classes in the Cityscapes dataset
+        input_features=3,  # RGB images
+        num_classes=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
 
     # Define the loss function
