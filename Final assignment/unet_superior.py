@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+import torch.optim as optim
 
 # https://medium.com/@oleg.belkovskiy/enhancing-unet-tailoring-superior-segmentation-models-through-transfer-learning-8323a519b877  
 
@@ -51,6 +52,38 @@ class DecoderBlock(nn.Module):
             
         output = self.layers(concatenated)
         return output
+    
+class DiceLoss(nn.Module):
+    def __init__(self, smooth=1):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+        
+    def forward(self, inputs, targets):
+        smooth = 1.0  # Smoothing factor to prevent division by zero
+        intersection = torch.sum(inputs * targets)
+        union = torch.sum(inputs) + torch.sum(targets)
+        dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
+        return 1.0 - dice  
+
+class CombinedLoss(nn.Module):
+    def __init__(self, gamma=0.85, weight_dice=0.25):
+        super(CombinedLoss, self).__init__()
+        self.criterion_BCE = nn.BCELoss()
+        self.criterion_Dice = DiceLoss()
+        self.gamma = gamma
+        self.weight_dice = weight_dice
+        
+    def get_optimizer_and_scheduler(self, model_parameters):
+        optimizer = optim.Adam(model_parameters)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
+        return optimizer, scheduler
+    
+    def forward(self, outputs, targets, epoch):
+
+        loss_BCE = self.criterion_BCE(outputs, targets)
+        loss_Dice = self.criterion_Dice(outputs, targets)
+        loss_comb = loss_Dice * self.weight_dice + \
+                    loss_BCE * (1 - self.weight_dice)
     
     
 class Model(nn.Module):
