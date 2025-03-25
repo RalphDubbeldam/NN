@@ -31,7 +31,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline import Model
+from unet import Model
 
 
 # Mapping class IDs to train IDs
