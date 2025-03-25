@@ -164,8 +164,9 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
+            loss_comb = combined_loss(outputs, labels, epoch)
             loss = criterion(outputs, labels)
-            loss.backward()
+            loss_comb.backward()
             optimizer.step()
 
             wandb.log({
@@ -223,6 +224,7 @@ def main(args):
                     f"best_model-epoch={epoch:04}-val_loss={valid_loss:04}.pth"
                 )
                 torch.save(model.state_dict(), current_best_model_path)
+        scheduler.step()
         
     print("Training complete!")
 
