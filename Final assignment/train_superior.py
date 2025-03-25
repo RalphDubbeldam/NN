@@ -1,18 +1,3 @@
-"""
-This script implements a training loop for the model. It is designed to be flexible, 
-allowing you to easily modify hyperparameters using a command-line argument parser.
-
-### Key Features:
-1. **Hyperparameter Tuning:** Adjust hyperparameters by parsing arguments from the `main.sh` script or directly 
-   via the command line.
-2. **Remote Execution Support:** Since this script runs on a server, training progress is not visible on the console. 
-   To address this, we use the `wandb` library for logging and tracking progress and results.
-3. **Encapsulation:** The training loop is encapsulated in a function, enabling it to be called from the main block. 
-   This ensures proper execution when the script is run directly.
-
-Feel free to customize the script as needed for your use case.
-test
-"""
 import os
 from argparse import ArgumentParser
 
@@ -31,7 +16,8 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_superior import Model
+from unet_superior import Model 
+from unet_superior import CombinedLoss
 
 
 # Mapping class IDs to train IDs
@@ -140,8 +126,26 @@ def main(args):
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
 
+    lr_e = 0.0005
+    lr_d = 0.0005
+    model_parameters = [
+        {'params': model.encoder1.parameters(), 'lr': lr_e},
+        {'params': model.encoder2.parameters(), 'lr': lr_e},
+        {'params': model.encoder3.parameters(), 'lr': lr_e},
+        {'params': model.encoder4.parameters(), 'lr': lr_e},
+        {'params': model.encoder5.parameters(), 'lr': lr_e},
+        {'params': model.bottleneck.parameters(), 'lr': lr_d},
+        {'params': model.decoder1.parameters(), 'lr': lr_d},
+        {'params': model.decoder2.parameters(), 'lr': lr_d},
+        {'params': model.decoder3.parameters(), 'lr': lr_d},
+        {'params': model.decoder4.parameters(), 'lr': lr_d},
+        {'params': model.decoder5.parameters(), 'lr': lr_d}, 
+        {'params': model.final_conv.parameters(), 'lr': lr_d}, 
+    ]
     # Define the optimizer
-    optimizer = AdamW(model.parameters(), lr=args.lr)
+    #optimizer = AdamW(model.parameters(), lr=args.lr)
+    combined_loss = CombinedLoss()
+    optimizer, scheduler = combined_loss.get_optimizer_and_scheduler(model_parameters)
 
     # Training loop
     best_valid_loss = float('inf')
