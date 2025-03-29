@@ -162,7 +162,8 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
-            lossDice = criterionDice(torch.softmax(outputs, dim=1), labels.float())
+            labels_one_hot = torch.nn.functional.one_hot(labels, num_classes=19).permute(0, 3, 1, 2)
+            lossDice = criterionDice(torch.softmax(outputs, dim=1), labels_one_hot.float())
             loss.backward()
             optimizer.step()
 
