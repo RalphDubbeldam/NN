@@ -162,7 +162,7 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
-            lossDice = criterionDice(outputs,labels.squeeze(0).type(torch.cuda.FloatTensor))
+            lossDice = criterionDice(torch.softmax(outputs, dim=1), labels.float())
             loss.backward()
             optimizer.step()
 
