@@ -75,29 +75,28 @@ def multiclass_dice_loss(pred, target, smooth=1):
     Computes Dice Loss for multi-class segmentation.
     Args:
         pred: Tensor of predictions (batch_size, C, H, W).
-        target: Ground truth class indices (batch_size, H, W).
+        target: Ground truth labels (batch_size, H, W) (not one-hot).
         smooth: Smoothing factor.
     Returns:
         Scalar Dice Loss.
     """
     pred = F.softmax(pred, dim=1)  # Convert logits to probabilities
-
-    # Ensure target is one-hot encoded
-    num_classes = pred.shape[1]  # Number of classes (C)
-    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()
-
-    dice = 0  # Initialize Dice loss accumulator
     
+    num_classes = pred.shape[1]  # Number of classes
+    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2)  # Convert to one-hot encoding
+    
+    dice = 0  # Initialize Dice loss accumulator
     for c in range(num_classes):  # Loop through each class
         pred_c = pred[:, c]  # Predictions for class c
         target_c = target_one_hot[:, c]  # One-hot ground truth for class c
-
-        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over spatial dimensions
+        
+        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Element-wise multiplication
         union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))  # Sum of all pixels
         
         dice += (2. * intersection + smooth) / (union + smooth)  # Per-class Dice score
 
     return 1 - dice.mean() / num_classes  # Average Dice Loss across classes
+
 
 def main(args):
     # Initialize wandb for logging
