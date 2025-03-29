@@ -186,7 +186,7 @@ def main(args):
             optimizer.step()
 
             wandb.log({
-                "train_loss": loss.item(),
+                "train_loss": lossDice,
                 "learning_rate": optimizer.param_groups[0]['lr'],
                 "epoch": epoch + 1,
             }, step=epoch * len(train_dataloader) + i)
