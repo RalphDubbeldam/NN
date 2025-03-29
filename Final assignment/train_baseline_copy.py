@@ -83,6 +83,7 @@ def multiclass_dice_loss(pred, target, smooth=1):
     pred = F.softmax(pred, dim=1)  # Convert logits to probabilities
     
     num_classes = pred.shape[1]  # Number of classes
+    target[target == 255] = 0  # Replace ignore class
     target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2)  # Convert to one-hot encoding
     
     dice = 0  # Initialize Dice loss accumulator
