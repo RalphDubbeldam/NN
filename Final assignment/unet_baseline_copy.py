@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class Model(nn.Module):
     """ 
@@ -93,16 +94,3 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
-    
-#https://discuss.pytorch.org/t/implementation-of-dice-loss/53552
-class DiceLoss(nn.Module):
-    def __init__(self):
-        super(DiceLoss, self).__init__()
-    def forward(self, pred, target):
-        smooth = 1.0
-        iflat = pred.contiguous().view(-1)
-        tflat = target.contiguous().view(-1)
-        intersection = (iflat * tflat).sum()
-        A_sum = torch.sum(iflat * iflat)
-        B_sum = torch.sum(tflat * tflat)
-        return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth))

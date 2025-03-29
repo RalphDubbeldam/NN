@@ -19,6 +19,7 @@ from argparse import ArgumentParser
 import wandb
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes, wrap_dataset_for_transforms_v2
@@ -32,7 +33,6 @@ from torchvision.transforms.v2 import (
 )
 
 from unet_baseline_copy import Model
-from unet_baseline_copy import DiceLoss
 
 
 # Mapping class IDs to train IDs
@@ -70,6 +70,30 @@ def get_args_parser():
 
     return parser
 
+def multiclass_dice_loss(pred, target, smooth=1):
+    """
+    Computes Dice Loss for multi-class segmentation.
+    Args:
+        pred: Tensor of predictions (batch_size, C, H, W).
+        target: One-hot encoded ground truth (batch_size, C, H, W).
+        smooth: Smoothing factor.
+    Returns:
+        Scalar Dice Loss.
+    """
+    pred = F.softmax(pred, dim=1)  # Convert logits to probabilities
+    num_classes = pred.shape[1]  # Number of classes (C)
+    dice = 0  # Initialize Dice loss accumulator
+    
+    for c in range(num_classes):  # Loop through each class
+        pred_c = pred[:, c]  # Predictions for class c
+        target_c = target[:, c]  # Ground truth for class c
+        
+        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Element-wise multiplication
+        union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))  # Sum of all pixels
+        
+        dice += (2. * intersection + smooth) / (union + smooth)  # Per-class Dice score
+
+    return 1 - dice.mean() / num_classes  # Average Dice Loss across classes
 
 def main(args):
     # Initialize wandb for logging
@@ -140,7 +164,7 @@ def main(args):
 
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
-    criterionDice = DiceLoss()
+
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
@@ -162,13 +186,12 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
-            labels_one_hot = torch.nn.functional.one_hot(labels, num_classes=19).permute(0, 3, 1, 2)
-            lossDice = criterionDice(torch.softmax(outputs, dim=1), labels_one_hot.float())
+            lossDice = multiclass_dice_loss(outputs, labels)  # Compute Dice Loss
             loss.backward()
             optimizer.step()
 
             wandb.log({
-                "train_loss": lossDice.item(),
+                "train_loss": loss.item(),
                 "learning_rate": optimizer.param_groups[0]['lr'],
                 "epoch": epoch + 1,
             }, step=epoch * len(train_dataloader) + i)
