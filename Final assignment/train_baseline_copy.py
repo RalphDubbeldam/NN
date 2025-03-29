@@ -70,6 +70,7 @@ def get_args_parser():
 
     return parser
 
+#https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
 def multiclass_dice_loss(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
 
@@ -194,6 +195,7 @@ def main(args):
         model.eval()
         with torch.no_grad():
             losses = []
+            lossesDice = []
             for i, (images, labels) in enumerate(valid_dataloader):
 
                 labels = convert_to_train_id(labels)  # Convert class IDs to train IDs
@@ -205,6 +207,7 @@ def main(args):
                 loss = criterion(outputs, labels)
                 lossDice = multiclass_dice_loss(outputs, labels)  # Compute Dice Loss
                 losses.append(loss.item())
+                lossesDice.append(lossDice)
             
                 if i == 0:
                     predictions = outputs.softmax(1).argmax(1)
@@ -227,9 +230,10 @@ def main(args):
                     }, step=(epoch + 1) * len(train_dataloader) - 1)
             
             valid_loss = sum(losses) / len(losses)
+            valid_lossDice = sum(lossesDice) / len(lossesDice)
             wandb.log({
-                "valid_loss": valid_loss
-                "valid_Diceloss": lossDice
+                "valid_loss": valid_loss,
+                "valid_Diceloss": valid_lossDice
             }, step=(epoch + 1) * len(train_dataloader) - 1)
 
             if valid_loss < best_valid_loss:
