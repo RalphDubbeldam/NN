@@ -181,12 +181,11 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
-            lossDice = multiclass_dice_loss(outputs, labels)  # Compute Dice Loss
             loss.backward()
             optimizer.step()
 
             wandb.log({
-                "train_loss": lossDice,
+                "train_loss": loss.item(),
                 "learning_rate": optimizer.param_groups[0]['lr'],
                 "epoch": epoch + 1,
             }, step=epoch * len(train_dataloader) + i)
@@ -204,6 +203,7 @@ def main(args):
 
                 outputs = model(images)
                 loss = criterion(outputs, labels)
+                lossDice = multiclass_dice_loss(outputs, labels)  # Compute Dice Loss
                 losses.append(loss.item())
             
                 if i == 0:
@@ -229,6 +229,7 @@ def main(args):
             valid_loss = sum(losses) / len(losses)
             wandb.log({
                 "valid_loss": valid_loss
+                "valid_Diceloss": lossDice
             }, step=(epoch + 1) * len(train_dataloader) - 1)
 
             if valid_loss < best_valid_loss:
