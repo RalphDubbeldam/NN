@@ -71,32 +71,23 @@ def get_args_parser():
     return parser
 
 def multiclass_dice_loss(pred, target, smooth=1):
-    """
-    Computes Dice Loss for multi-class segmentation.
-    Args:
-        pred: Tensor of predictions (batch_size, C, H, W).
-        target: Ground truth labels (batch_size, H, W) (not one-hot).
-        smooth: Smoothing factor.
-    Returns:
-        Scalar Dice Loss.
-    """
-    pred = F.softmax(pred, dim=1)  # Convert logits to probabilities
-    
-    num_classes = pred.shape[1]  # Number of classes
-    target[target == 255] = 0  # Replace ignore class
-    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2)  # Convert to one-hot encoding
-    
-    dice = 0  # Initialize Dice loss accumulator
-    for c in range(num_classes):  # Loop through each class
-        pred_c = pred[:, c]  # Predictions for class c
-        target_c = target_one_hot[:, c]  # One-hot ground truth for class c
-        
-        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Element-wise multiplication
-        union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))  # Sum of all pixels
-        
-        dice += (2. * intersection + smooth) / (union + smooth)  # Per-class Dice score
+    pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
 
-    return 1 - dice.mean() / num_classes  # Average Dice Loss across classes
+    num_classes = pred.shape[1]
+    target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
+    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()
+
+    dice = 0
+    for c in range(num_classes):
+        pred_c = pred[:, c].clone()  # Clone to prevent in-place modification
+        target_c = target_one_hot[:, c]
+
+        intersection = (pred_c * target_c).sum(dim=(1, 2))
+        union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
+
+        dice += (2. * intersection + smooth) / (union + smooth)
+
+    return 1 - dice.mean() / num_classes
 
 
 def main(args):
