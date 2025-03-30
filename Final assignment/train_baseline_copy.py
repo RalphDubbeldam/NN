@@ -33,30 +33,39 @@ from torchvision.transforms.v2 import (
     RandomHorizontalFlip,
 )
 from torchvision.transforms.v2.functional import hflip
+from torchvision.transforms.v2 import (
+    RandomRotation, Resize, RandomHorizontalFlip, RandomVerticalFlip,
+    ColorJitter, ToDtype, Normalize, Compose, ToImage)
 from unet_baseline_copy import Model
+
+from torchvision.transforms.v2 import RandomRotation
 
 class CustomTransform:
     def __init__(self):
         self.image_transform = Compose([
             ToImage(),
-            Resize((256, 256)),
+            Resize((1024, 1024)),  # Resize to 1024x1024
+            RandomRotation(degrees=10),  # Rotate randomly between -10° and 10°
+            RandomHorizontalFlip(p=0.5),  # 50% probability to flip horizontally
+            ColorJitter(
+                brightness=0.5, 
+                contrast=0.5, 
+                saturation=0.5, 
+                hue=0.5
+            ),  # Random adjustments for brightness, contrast, saturation, hue
             ToDtype(torch.float32, scale=True),
-            Normalize((0.5,), (0.5,)),
-        ])
-        self.label_transform = Compose([
-            ToImage(),
-            Resize((256, 256), interpolation=0),  # Nearest neighbor to avoid distortions
-            ToDtype(torch.int64)  # Ensure labels are in integer format
+            Normalize((0.5,), (0.5,)),  # Normalize
         ])
 
     def __call__(self, img, target):
-        if torch.rand(1) < 0.5:  # 50% probability of flipping
+        # Apply horizontal flip manually (for label consistency)
+        if torch.rand(1) < 0.5:
             img = hflip(img)
             target = hflip(target)
 
-        img = self.image_transform(img)
-        target = self.label_transform(target)  # Ensure labels are processed
+        img = self.image_transform(img)  
         return img, target
+
 
 
 # Mapping class IDs to train IDs
