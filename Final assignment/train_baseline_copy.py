@@ -30,23 +30,21 @@ from torchvision.transforms.v2 import (
     Resize,
     ToImage,
     ToDtype,
-    RandomHorizontalFlip,
 )
 from torchvision.transforms.v2.functional import hflip
 from torchvision.transforms.v2 import (
-    RandomRotation, Resize, RandomHorizontalFlip, RandomVerticalFlip,
+    RandomRotation, Resize, 
     ColorJitter, ToDtype, Normalize, Compose, ToImage)
 from unet_baseline_copy import Model
-
+from torchvision.transforms import InterpolationMode
 from torchvision.transforms.v2 import RandomRotation
 
 class CustomTransform:
     def __init__(self):
         self.image_transform = Compose([
             ToImage(),
-            Resize((256, 256)),  # Resize to 1024x1024
+            Resize((256, 256)),  # Resize to 256x256
             RandomRotation(degrees=10),  # Rotate randomly between -10° and 10°
-            RandomHorizontalFlip(p=0.5),  # 50% probability to flip horizontally
             ColorJitter(
                 brightness=0.5, 
                 contrast=0.5, 
@@ -56,7 +54,7 @@ class CustomTransform:
             ToDtype(torch.float32, scale=True),
             Normalize((0.5,), (0.5,)),  # Normalize
         ])
-        self.label_transform = Resize((256, 256), interpolation=0)
+        self.label_transform = Resize((256, 256), InterpolationMode.NEAREST)
 
     def __call__(self, img, target):
         # Apply horizontal flip manually (for label consistency)
@@ -66,6 +64,7 @@ class CustomTransform:
 
         img = self.image_transform(img)  
         target = self.label_transform(target)
+        target = target.to(torch.long)
         return img, target
 
 
