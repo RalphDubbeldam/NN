@@ -63,10 +63,6 @@ class CustomTransform:
         self.label_transform = Resize((256, 256), interpolation=F.InterpolationMode.NEAREST)
 
     def __call__(self, img, target):
-        # Convert to tensor first
-        img = ToTensor()(img)
-        target = ToTensor()(target)  # Ensure target is a tensor
-
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
         img = F.rotate(img, angle)  
