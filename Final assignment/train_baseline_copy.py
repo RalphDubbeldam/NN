@@ -44,7 +44,7 @@ class CustomTransform:
     def __init__(self):
         self.image_transform = Compose([
             ToImage(),
-            Resize((1024, 1024)),  # Resize to 1024x1024
+            Resize((256, 256)),  # Resize to 1024x1024
             RandomRotation(degrees=10),  # Rotate randomly between -10° and 10°
             RandomHorizontalFlip(p=0.5),  # 50% probability to flip horizontally
             ColorJitter(
