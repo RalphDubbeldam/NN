@@ -51,26 +51,23 @@ class CustomTransform:
     def __init__(self):
         self.image_transform = Compose([
             ToTensor(),
-            Resize((256, 256)),  # Resize image
+            Resize((512, 1024)),  # Resize image
             Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
         ])
-        self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
+        self.label_transform = Resize((512, 1024), interpolation=Fv.InterpolationMode.NEAREST)
 
     def __call__(self, img, target):
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
         img = Fv.rotate(img, angle)  
         target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
-
         # Apply horizontal flip manually (for label consistency)
         if torch.rand(1) < 0.5:
             img = F2.hflip(img)
             target = F2.hflip(target)
-
         img = self.image_transform(img)
         target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
-
         return img, target
 
 # Mapping class IDs to train IDs
