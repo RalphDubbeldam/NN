@@ -40,7 +40,7 @@ from torchvision.transforms import InterpolationMode
 from torchvision.transforms.v2 import RandomRotation
 
 import torch
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as Fv
 from torchvision.transforms import (
     Compose, Resize, ColorJitter, Normalize, ToTensor
 )
@@ -65,8 +65,8 @@ class CustomTransform:
     def __call__(self, img, target):
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
-        img = F.rotate(img, angle)  
-        target = F.rotate(target, angle, interpolation=F.InterpolationMode.NEAREST)  
+        img = Fv.rotate(img, angle)  
+        target = Fv.rotate(target, angle, interpolation=F.InterpolationMode.NEAREST)  
 
         # Apply horizontal flip manually (for label consistency)
         if torch.rand(1) < 0.5:
@@ -119,7 +119,7 @@ def get_args_parser():
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
 def multiclass_dice_coefficient(pred, target, smooth=1):
-    pred = torch.nn.functional.softmax(pred.clone(), dim=1) # Clone to avoid modifying original tensor
+    pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
 
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
