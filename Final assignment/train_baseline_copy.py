@@ -52,13 +52,13 @@ class CustomTransform:
         self.image_transform = Compose([
             ToTensor(),
             Resize((256, 256)),  # Resize image
-            ColorJitter(
-                brightness=0.5, 
-                contrast=0.5, 
-                saturation=0.5, 
-                hue=0.1  # Hue=0.5 might be too strong
-            ),
-            #Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
+            #ColorJitter(
+            #    brightness=0.5, 
+            #    contrast=0.5, 
+            #    saturation=0.5, 
+            #    hue=0.1  # Hue=0.5 might be too strong
+            #),
+            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
 
