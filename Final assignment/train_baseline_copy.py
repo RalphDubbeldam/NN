@@ -56,23 +56,60 @@ class CustomTransform:
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
 
+import torch
+import random
+import torchvision.transforms.functional as F
+from torchvision.transforms import (
+    Compose, Resize, Normalize, ToTensor, RandomResizedCrop
+)
+
+import torch
+import random
+import torchvision.transforms.functional as F
+from torchvision.transforms import (
+    Compose, Resize, Normalize, ToTensor, RandomResizedCrop
+)
+
+class CustomTransform:
+    def __init__(self):
+        self.image_transform = Compose([
+            ToTensor(),  # Convert image to tensor
+            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
+        ])
+        self.label_transform = Compose([])  # No normalization for labels
+
+        # Initialize RandomResizedCrop for zooming & cropping (for image)
+        self.random_resized_crop = RandomResizedCrop(
+            size=(256, 256), 
+            scale=(0.8, 1.2),  # Zooming (80% - 120%)
+            ratio=(0.9, 1.1)   # Aspect ratio variation
+        )
+
     def __call__(self, img, target):
-        target = ToTensor()(target)
+        # Ensure target is already a tensor
+        if not isinstance(target, torch.Tensor):
+            raise TypeError(f"Expected target to be a tensor, but got {type(target)}")
+
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
-        img = Fv.rotate(img, angle)  
-        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
+        img = F.rotate(img, angle)
+        target = F.rotate(target, angle, interpolation=F.InterpolationMode.NEAREST)
 
         # Apply horizontal flip manually (for label consistency)
         if torch.rand(1) < 0.5:
-            img = F2.hflip(img)
-            target = F2.hflip(target)
+            img = F.hflip(img)
+            target = F.hflip(target)
 
+        # Apply RandomResizedCrop (Zooming & Cropping)
+        img, target = self.random_resized_crop(img, target)  # Same crop for both
+
+        # Apply final transformations to the image and target
         img = self.image_transform(img)
-        target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
 
         return img, target
+
+
 
 # Mapping class IDs to train IDs
 id_to_trainid = {cls.id: cls.train_id for cls in Cityscapes.classes}
