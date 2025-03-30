@@ -64,18 +64,18 @@ class CustomTransform:
 
     def __call__(self, img, target):
         # Apply the same random rotation
-        #angle = random.uniform(-10, 10)  # Generate random angle
-        #img = Fv.rotate(img, angle)  
-        #target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
+        angle = random.uniform(-10, 10)  # Generate random angle
+        img = Fv.rotate(img, angle)  
+        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
 
         # Apply horizontal flip manually (for label consistency)
-        #if torch.rand(1) < 0.5:
-        #    img = F2.hflip(img)
-        #    target = F2.hflip(target)
+        if torch.rand(1) < 0.5:
+            img = F2.hflip(img)
+            target = F2.hflip(target)
 
-        img = self.image_transform(img)
-        target = self.label_transform(target)
-        target = target.to(torch.long)  # Ensure labels are integers
+        #img = self.image_transform(img)
+        #target = self.label_transform(target)
+        #target = target.to(torch.long)  # Ensure labels are integers
 
         return img, target
 
