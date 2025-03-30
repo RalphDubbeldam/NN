@@ -30,9 +30,27 @@ from torchvision.transforms.v2 import (
     Resize,
     ToImage,
     ToDtype,
+    RandomHorizontalFlip,
 )
-
+from torchvision.transforms.v2.functional import hflip
 from unet_baseline_copy import Model
+
+class CustomTransform:
+    def __init__(self):
+        self.image_transform = Compose([
+            ToImage(),
+            Resize((256, 256)),
+            ToDtype(torch.float32, scale=True),
+            Normalize((0.5,), (0.5,)),
+        ])
+
+    def __call__(self, img, target):
+        if torch.rand(1) < 0.5:  # 50% probability of flipping
+            img = hflip(img)
+            target = hflip(target)  # Flip label image identically
+
+        img = self.image_transform(img)
+        return img, target
 
 
 # Mapping class IDs to train IDs
@@ -113,12 +131,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    transform = Compose([
-        ToImage(),
-        Resize((256, 256)),
-        ToDtype(torch.float32, scale=True),
-        Normalize((0.5,), (0.5,)),
-    ])
+    transform = CustomTransform()
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
