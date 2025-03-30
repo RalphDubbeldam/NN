@@ -39,33 +39,50 @@ from unet_baseline_copy import Model
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms.v2 import RandomRotation
 
+import torch
+import torchvision.transforms.functional as F
+from torchvision.transforms import (
+    Compose, Resize, ColorJitter, Normalize, ToTensor
+)
+import torchvision.transforms.v2.functional as F2
+import random
+
 class CustomTransform:
     def __init__(self):
         self.image_transform = Compose([
-            ToImage(),
-            Resize((256, 256)),  # Resize to 256x256
-            RandomRotation(degrees=10),  # Rotate randomly between -10° and 10°
+            ToTensor(),
+            Resize((256, 256)),  # Resize image
             ColorJitter(
                 brightness=0.5, 
                 contrast=0.5, 
                 saturation=0.5, 
-                hue=0.5
-            ),  # Random adjustments for brightness, contrast, saturation, hue
-            ToDtype(torch.float32, scale=True),
-            Normalize((0.5,), (0.5,)),  # Normalize
+                hue=0.1  # Hue=0.5 might be too strong
+            ),
+            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
         ])
-        self.label_transform = Resize((256, 256), InterpolationMode.NEAREST)
+        self.label_transform = Resize((256, 256), interpolation=F.InterpolationMode.NEAREST)
 
     def __call__(self, img, target):
+        # Convert to tensor first
+        img = ToTensor()(img)
+        target = ToTensor()(target)  # Ensure target is a tensor
+
+        # Apply the same random rotation
+        angle = random.uniform(-10, 10)  # Generate random angle
+        img = F.rotate(img, angle)  
+        target = F.rotate(target, angle, interpolation=F.InterpolationMode.NEAREST)  
+
         # Apply horizontal flip manually (for label consistency)
         if torch.rand(1) < 0.5:
-            img = hflip(img)
-            target = hflip(target)
+            img = F2.hflip(img)
+            target = F2.hflip(target)
 
-        img = self.image_transform(img)  
+        img = self.image_transform(img)
         target = self.label_transform(target)
-        target = target.to(torch.long)
+        target = target.to(torch.long)  # Ensure labels are integers
+
         return img, target
+
 
 
 
