@@ -56,6 +56,7 @@ class CustomTransform:
             ToDtype(torch.float32, scale=True),
             Normalize((0.5,), (0.5,)),  # Normalize
         ])
+        self.label_transform = Resize((256, 256), interpolation=0)
 
     def __call__(self, img, target):
         # Apply horizontal flip manually (for label consistency)
@@ -64,6 +65,7 @@ class CustomTransform:
             target = hflip(target)
 
         img = self.image_transform(img)  
+        target = self.label_transform(target)
         return img, target
 
 
