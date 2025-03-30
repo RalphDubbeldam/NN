@@ -43,13 +43,19 @@ class CustomTransform:
             ToDtype(torch.float32, scale=True),
             Normalize((0.5,), (0.5,)),
         ])
+        self.label_transform = Compose([
+            ToImage(),
+            Resize((256, 256), interpolation=0),  # Nearest neighbor to avoid distortions
+            ToDtype(torch.int64)  # Ensure labels are in integer format
+        ])
 
     def __call__(self, img, target):
         if torch.rand(1) < 0.5:  # 50% probability of flipping
             img = hflip(img)
-            target = hflip(target)  # Flip label image identically
+            target = hflip(target)
 
         img = self.image_transform(img)
+        target = self.label_transform(target)  # Ensure labels are processed
         return img, target
 
 
