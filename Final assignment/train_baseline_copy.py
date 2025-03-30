@@ -67,18 +67,6 @@ class CustomTransform:
             img = F2.hflip(img)
             target = F2.hflip(target)
 
-        # Apply zooming (random scaling)
-        zoom_factor = random.uniform(0.8, 1.2)  # Random zoom factor between 0.8 and 1.2
-        width, height = img.size
-        new_width = int(width * zoom_factor)
-        new_height = int(height * zoom_factor)
-        img = Fv.resize(img, (new_width, new_height))
-        target = Fv.resize(target, (new_width, new_height), interpolation=Fv.InterpolationMode.NEAREST)
-
-        # Center crop to ensure the output size is still 256x256
-        img = Fv.center_crop(img, (256, 256))
-        target = Fv.center_crop(target, (256, 256))
-
         img = self.image_transform(img)
         target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
