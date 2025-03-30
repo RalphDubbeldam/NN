@@ -119,7 +119,7 @@ def get_args_parser():
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
 def multiclass_dice_coefficient(pred, target, smooth=1):
-    pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
+    pred = torch.nn.functional.softmax(pred.clone(), dim=1) # Clone to avoid modifying original tensor
 
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
