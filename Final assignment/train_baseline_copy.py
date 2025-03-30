@@ -52,7 +52,7 @@ class CustomTransform:
         self.image_transform = Compose([
             ToTensor(),
             Resize((256, 256)),  # Resize image
-            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
+            Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
 
