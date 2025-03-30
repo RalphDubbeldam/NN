@@ -60,13 +60,13 @@ class CustomTransform:
             ),
             Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),  # Normalize for RGB
         ])
-        self.label_transform = Resize((256, 256), interpolation=F.InterpolationMode.NEAREST)
+        self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
 
     def __call__(self, img, target):
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
         img = Fv.rotate(img, angle)  
-        target = Fv.rotate(target, angle, interpolation=F.InterpolationMode.NEAREST)  
+        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
 
         # Apply horizontal flip manually (for label consistency)
         if torch.rand(1) < 0.5:
