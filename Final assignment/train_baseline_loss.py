@@ -89,7 +89,7 @@ def multiclass_dice_coefficient(pred, target, smooth=1):
         dice += (2. * intersection + smooth) / (union + smooth)
     return dice.mean() / num_classes
 
-def combined_loss(loss, diceloss, lambda_param=3.0): #larger lambda makes the dominant loss more dominant
+def combined_loss(loss, diceloss, lambda_param=0.5): #larger lambda makes the dominant loss more dominant, balanced at 1
     exp_ce = torch.exp(lambda_param * loss)
     exp_dice = torch.exp(lambda_param * diceloss)
     ce_weight = exp_ce / (exp_ce + exp_dice)
