@@ -33,8 +33,6 @@ from torchvision.transforms.v2.functional import hflip
 from torchvision.transforms.v2 import (
      Resize, Normalize, Compose)
 from unet_baseline_augm import Model
-from torchvision.transforms import
-from torchvision.transforms.v2 import
 
 import torch
 import torchvision.transforms.functional as Fv
