@@ -17,10 +17,10 @@ class Model(nn.Module):
         self.down2 = (Down(128, 256))
         self.down3 = (Down(256, 512))
         self.down4 = (Down(512, 512))
-        self.up1 = Up(1024, 512)
-        self.up2 = Up(512, 256)
-        self.up3 = Up(256, 128)
-        self.up4 = Up(128, 64)
+        self.up1 = (Up(1024, 256))
+        self.up2 = (Up(512, 128))
+        self.up3 = (Up(256, 64))
+        self.up4 = (Up(128, 64))
         self.outc = (OutConv(64, n_classes))
 
     def forward(self, x):
@@ -70,7 +70,7 @@ class Down(nn.Module):
 
     def forward(self, x):
         return self.maxpool_conv(x)
-    
+
 
 class Up(nn.Module):
     """Upscaling then double conv"""
@@ -78,11 +78,11 @@ class Up(nn.Module):
     def __init__(self, in_channels, out_channels, bilinear=True):
         super().__init__()
         self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv = DoubleConv(in_channels, out_channels)
-
+        self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+        
     def forward(self, x1, x2):
         x1 = self.up(x1)
-        x = torch.cat([x2, x1], dim=1)  # Ensure correct concatenation
+        x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 
 
