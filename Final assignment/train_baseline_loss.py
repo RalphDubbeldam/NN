@@ -97,6 +97,13 @@ def multiclass_dice_coefficient(pred, target, smooth=1):
         dice += (2. * intersection + smooth) / (union + smooth)
     return dice.mean() / num_classes
 
+def combined_loss(loss, diceloss, lambda_param=1.0):
+    exp_ce = torch.exp(lambda_param * loss)
+    exp_dice = torch.exp(lambda_param * diceloss)
+    ce_weight = exp_ce / (exp_ce + exp_dice)
+    dice_weight = exp_dice / (exp_ce + exp_dice)
+
+    return ce_weight * loss + dice_weight * diceloss
 
 def main(args):
     # Initialize wandb for logging
@@ -188,9 +195,8 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            Diceloss = 1- multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
-            loss = criterion(outputs, labels)
-            loss = loss+Diceloss
+            Diceloss = 1- multiclass_dice_coefficient(outputs, labels) 
+            loss = combined_loss(criterion(outputs, labels),Diceloss,1)
             loss.backward()
             optimizer.step()
 

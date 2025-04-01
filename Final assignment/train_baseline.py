@@ -98,7 +98,6 @@ def multiclass_dice_coefficient(pred, target, smooth=1):
 
     return dice.mean() / num_classes
 
-
 def main(args):
     # Initialize wandb for logging
     wandb.init(
