@@ -76,28 +76,20 @@ import torch.nn.functional as F
 
 def multiclass_dice_coefficient(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
-
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
-    
     # Ensure target is one-hot encoded and has the same shape as pred
     target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()  # [batch_size, num_classes, height, width]
-
     dice = 0
     for c in range(num_classes):
         pred_c = pred[:, c]  # Extract the prediction for class 'c'
         target_c = target_one_hot[:, c]  # Extract the target for class 'c'
-
-        # Ensure that the shapes match
-        assert pred_c.shape == target_c.shape, f"Shape mismatch: {pred_c.shape} vs {target_c.shape}"
-
         intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over height and width
         union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
-
         dice += (2. * intersection + smooth) / (union + smooth)
     return dice.mean() / num_classes
 
-def combined_loss(loss, diceloss, lambda_param=1.0):
+def combined_loss(loss, diceloss, lambda_param=3.0): #larger lambda makes the dominant loss more dominant
     exp_ce = torch.exp(lambda_param * loss)
     exp_dice = torch.exp(lambda_param * diceloss)
     ce_weight = exp_ce / (exp_ce + exp_dice)
