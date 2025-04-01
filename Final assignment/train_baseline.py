@@ -71,24 +71,33 @@ def get_args_parser():
     return parser
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
+import torch
+import torch.nn.functional as F
+
 def multiclass_dice_coefficient(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
 
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
-    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()
+    
+    # Ensure target is one-hot encoded and has the same shape as pred
+    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()  # [batch_size, num_classes, height, width]
 
     dice = 0
     for c in range(num_classes):
-        pred_c = pred[:, c].clone()  # Clone to prevent in-place modification
-        target_c = target_one_hot[:, c]
+        pred_c = pred[:, c]  # Extract the prediction for class 'c'
+        target_c = target_one_hot[:, c]  # Extract the target for class 'c'
 
-        intersection = (pred_c * target_c).sum(dim=(1, 2))
+        # Ensure that the shapes match
+        assert pred_c.shape == target_c.shape, f"Shape mismatch: {pred_c.shape} vs {target_c.shape}"
+
+        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over height and width
         union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
 
         dice += (2. * intersection + smooth) / (union + smooth)
 
     return dice.mean() / num_classes
+
 
 def main(args):
     # Initialize wandb for logging
@@ -201,8 +210,8 @@ def main(args):
                 images, labels = images.to(device), labels.to(device)
 
                 labels = labels.long().squeeze(1)  # Remove channel dimension
-                #Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
-                #Dices.append(Dice)
+                Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
+                Dices.append(Dice)
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 losses.append(loss.item())
@@ -228,10 +237,10 @@ def main(args):
                     }, step=(epoch + 1) * len(train_dataloader) - 1)
             
             valid_loss = sum(losses) / len(losses)
-            #valid_Dice = sum(Dices) / len(Dices)
+            valid_Dice = sum(Dices) / len(Dices)
             wandb.log({
                 "valid_loss": valid_loss,
-            #    "valid_DiceCoefficient": valid_Dice,
+                "valid_DiceCoefficient": valid_Dice,
             }, step=(epoch + 1) * len(train_dataloader) - 1)
 
             if valid_loss < best_valid_loss:
