@@ -210,9 +210,9 @@ def main(args):
                 images, labels = images.to(device), labels.to(device)
 
                 labels = labels.long().squeeze(1)  # Remove channel dimension
+                outputs = model(images)
                 Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
                 Dices.append(Dice)
-                outputs = model(images)
                 loss = criterion(outputs, labels)
                 losses.append(loss.item())
             
