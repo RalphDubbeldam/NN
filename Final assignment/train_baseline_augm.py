@@ -28,21 +28,18 @@ from torchvision.transforms.v2 import (
     Compose,
     Normalize,
     Resize,
-    ToImage,
-    ToDtype,
 )
 from torchvision.transforms.v2.functional import hflip
 from torchvision.transforms.v2 import (
-    RandomRotation, Resize, 
-    ColorJitter, ToDtype, Normalize, Compose, ToImage)
-from unet_baseline_copy import Model
-from torchvision.transforms import InterpolationMode
-from torchvision.transforms.v2 import RandomRotation
+     Resize, Normalize, Compose)
+from unet_baseline_augm import Model
+from torchvision.transforms import
+from torchvision.transforms.v2 import
 
 import torch
 import torchvision.transforms.functional as Fv
 from torchvision.transforms import (
-    Compose, Resize, ColorJitter, Normalize, ToTensor
+    Compose, Resize, Normalize, ToTensor
 )
 import torchvision.transforms.v2.functional as F2
 import random
