@@ -201,8 +201,8 @@ def main(args):
                 images, labels = images.to(device), labels.to(device)
 
                 labels = labels.long().squeeze(1)  # Remove channel dimension
-                Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
-                Dices.append(Dice)
+                #Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
+                #Dices.append(Dice)
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 losses.append(loss.item())
@@ -228,10 +228,10 @@ def main(args):
                     }, step=(epoch + 1) * len(train_dataloader) - 1)
             
             valid_loss = sum(losses) / len(losses)
-            valid_Dice = sum(Dices) / len(Dices)
+            #valid_Dice = sum(Dices) / len(Dices)
             wandb.log({
                 "valid_loss": valid_loss,
-                "valid_DiceCoefficient": valid_Dice,
+            #    "valid_DiceCoefficient": valid_Dice,
             }, step=(epoch + 1) * len(train_dataloader) - 1)
 
             if valid_loss < best_valid_loss:
