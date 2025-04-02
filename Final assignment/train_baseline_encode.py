@@ -188,6 +188,7 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
+            outputs = torch.stack(outputs, dim=0)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
