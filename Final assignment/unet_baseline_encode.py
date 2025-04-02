@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
-from base import BaseModel
 from utils.helpers import initialize_weights
 from itertools import chain
 
@@ -116,7 +115,7 @@ class FPN_fuse(nn.Module):
         x = self.conv_fusion(torch.cat((P), dim=1))
         return x
 
-class UperNet(BaseModel):
+class UperNet(nn.Module):
     # Implementing only the object path
     def __init__(self, num_classes, in_channels=3, backbone='resnet101', pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False, **_):
         super(UperNet, self).__init__()
