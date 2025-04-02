@@ -162,7 +162,7 @@ def main(args):
     # Define the model
     model = Model(
         in_channels=3,  # RGB images
-        n_classes=19,  # 19 classes in the Cityscapes dataset
+        output_stride=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
 
     # Define the loss function
