@@ -188,7 +188,8 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            outputs = torch.stack(outputs, dim=0)
+            # Resize outputs to match the size of labels
+            outputs = F.interpolate(outputs, size=labels.shape[2:], mode='bilinear', align_corners=False)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
