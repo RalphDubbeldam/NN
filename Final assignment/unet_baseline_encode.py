@@ -1,117 +1,92 @@
 import torch
 import torch.nn as nn
 
-class DoubleConv(nn.Module):
-    """(convolution => [BN] => ReLU) * 2"""
-
-    def __init__(self, in_channels, out_channels, mid_channels=None):
-        super().__init__()
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(mid_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x):
-        return self.double_conv(x)
-
-
-class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
-
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
-        )
-
-    def forward(self, x):
-        return self.maxpool_conv(x)
-
-class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        return self.conv(x)
-
-
-class AttentionBlock(nn.Module):
-    """Attention Gate to refine skip connections."""
-    def __init__(self, in_channels, gating_channels, inter_channels):
-        super(AttentionBlock, self).__init__()
-        
-        self.W_x = nn.Sequential(
-            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(inter_channels)
-        )
-        
-        self.W_g = nn.Sequential(
-            nn.Conv2d(gating_channels, inter_channels, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(inter_channels)
-        )
-        
-        self.psi = nn.Sequential(
-            nn.Conv2d(inter_channels, 1, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(1),
-            nn.Sigmoid()
-        )
-        
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
-    def forward(self, x, g):
-        x1 = self.W_x(x)
-        g1 = self.W_g(g)
-        psi = self.relu(x1 + g1)
-        psi = self.psi(psi)
-        return x * psi
-
-class Up(nn.Module):
-    """Upscaling with attention and then double conv"""
-    def __init__(self, in_channels, out_channels, bilinear=True):
-        super().__init__()
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.attention = AttentionBlock(in_channels // 2, in_channels // 2, in_channels // 4)
-        self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
-
-    def forward(self, x1, x2):
-        x1 = self.up(x1)
-        x2 = self.attention(x2, x1)
-        x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out += identity
+        return self.relu(out)
 
 class Model(nn.Module):
-    """U-Net with Attention Mechanism."""
-    def __init__(self, in_channels=3, n_classes=16):
+    def __init__(self, in_channels=3, n_classes=19):
         super(Model, self).__init__()
+        
+        # Stem
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
 
-        self.inc = DoubleConv(in_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 512)
-        self.up1 = Up(1024, 256)
-        self.up2 = Up(512, 128)
-        self.up3 = Up(256, 64)
-        self.up4 = Up(128, 64)
-        self.outc = OutConv(64, n_classes)
+        # Stage 1
+        self.layer1 = self._make_layer(64, 32, 4)
+        
+        # Stage 2
+        self.transition1 = self._make_transition(32, [32, 64])
+        self.stage2 = nn.ModuleList([
+            self._make_layer(32, 32, 4),
+            self._make_layer(64, 64, 4)
+        ])
+        
+        # Stage 3
+        self.transition2 = self._make_transition(64, [32, 64, 128])
+        self.stage3 = nn.ModuleList([
+            self._make_layer(32, 32, 4),
+            self._make_layer(64, 64, 4),
+            self._make_layer(128, 128, 4)
+        ])
+        
+        # Stage 4
+        self.transition3 = self._make_transition(128, [32, 64, 128, 256])
+        self.stage4 = nn.ModuleList([
+            self._make_layer(32, 32, 4),
+            self._make_layer(64, 64, 4),
+            self._make_layer(128, 128, 4),
+            self._make_layer(256, 256, 4)
+        ])
+
+        # Final classifier
+        self.final_layer = nn.Conv2d(32, n_classes, kernel_size=1)
+
+    def _make_layer(self, in_channels, out_channels, blocks):
+        layers = [BasicBlock(in_channels, out_channels)]
+        for _ in range(1, blocks):
+            layers.append(BasicBlock(out_channels, out_channels))
+        return nn.Sequential(*layers)
+
+    def _make_transition(self, prev_channels, new_channels_list):
+        layers = []
+        for new_channels in new_channels_list:
+            layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
+        return nn.ModuleList(layers)
 
     def forward(self, x):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        logits = self.outc(x)
-        return logits
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.layer1(x)
+        
+        x_list = [t(x) for t in self.transition1]
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]
+        
+        x_list = [t(x_list[-1]) for t in self.transition2] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]
+        
+        x_list = [t(x_list[-1]) for t in self.transition3] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]
+
+        out = self.final_layer(x_list[0])  # Use the highest resolution branch
+        return out
+
+
