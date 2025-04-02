@@ -32,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_encode import ResNet18
+from unet_baseline_encode import (ResNet,BasicBlock)
 
 
 # Mapping class IDs to train IDs
@@ -161,7 +161,7 @@ def main(args):
 
     # Define the model
     # Initialize the ResNet-18 model
-    model = ResNet18(pretrained=False)
+    model = ResNet(BasicBlock, [2, 2, 2, 2], deep_base=False, num_classes=19)
     model = model.to(device)
 
     # Define the loss function
