@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
-from utils.helpers import initialize_weights
 from itertools import chain
 
 class PSPModule(nn.Module):
@@ -47,7 +46,6 @@ class Model(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
             )
-            initialize_weights(self.initial)
         else:
             self.initial = nn.Sequential(*list(model.children())[:4])
         
@@ -124,13 +122,11 @@ class UperNet(nn.Module):
             feature_channels = [64, 128, 256, 512]
         else:
             feature_channels = [256, 512, 1024, 2048]
-        self.backbone = ResNet(in_channels, backbone=backbone, pretrained=pretrained)
+        self.backbone = Model(in_channels, backbone=backbone, pretrained=pretrained)
         self.PPN = PSPModule(feature_channels[-1])
         self.FPN = FPN_fuse(feature_channels, fpn_out=fpn_out)
         self.head = nn.Conv2d(fpn_out, num_classes, kernel_size=3, padding=1)
         if freeze_bn: self.freeze_bn()
-        if freeze_backbone: 
-            set_trainable([self.backbone], False)
 
     def forward(self, x):
         input_size = (x.size()[2], x.size()[3])
