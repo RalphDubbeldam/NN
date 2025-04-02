@@ -32,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_encode import (Model, ResNet)
+from unet_baseline_encode import ResNet18
 
 
 # Mapping class IDs to train IDs
@@ -160,10 +160,9 @@ def main(args):
     )
 
     # Define the model
-    model = ResNet(
-        in_channels=3,  # RGB images
-        output_stride=19,  # 19 classes in the Cityscapes dataset
-    ).to(device)
+    # Initialize the ResNet-18 model
+    model = ResNet18(pretrained=False)
+    model = model.to(device)
 
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
