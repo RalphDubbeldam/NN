@@ -81,6 +81,7 @@ class Model(nn.Module):
         layers = []
         # Ensure each transition layer is correctly mapped
         for prev_channels, new_channels in zip(prev_channels_list, new_channels_list):
+            # Add a convolutional layer to match the number of channels
             layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
         return nn.ModuleList(layers)
 
@@ -94,18 +95,17 @@ class Model(nn.Module):
         x = self.layer1(x)
         
         # Stage 2
-        x_list = [t(x) for t in self.transition1]
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]
+        x_list = [t(x) for t in self.transition1]  # Transition 1 outputs
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]  # Stage 2 outputs
         
         # Stage 3
-        x_list = [t(x_list[-1]) for t in self.transition2] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]
+        x_list = [t(x_list[i]) for i, t in enumerate(self.transition2)] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]  # Stage 3 outputs
         
         # Stage 4
-        x_list = [t(x_list[-1]) for t in self.transition3] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]
+        x_list = [t(x_list[i]) for i, t in enumerate(self.transition3)] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]  # Stage 4 outputs
 
         # Final output
         out = self.final_layer(x_list[0])  # Use the highest resolution branch
         return out
-
