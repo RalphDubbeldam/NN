@@ -10,15 +10,28 @@ class BasicBlock(nn.Module):
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
+        # **Fix: Add a 1x1 convolution if in_channels != out_channels**
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
+
     def forward(self, x):
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)  # Adjust identity to match out_channels
+
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
         out = self.conv2(out)
         out = self.bn2(out)
-        out += identity
+        
+        out += identity  # Now identity and out match in channels
         return self.relu(out)
+
 
 class Model(nn.Module):
     def __init__(self, in_channels=3, n_classes=19):
