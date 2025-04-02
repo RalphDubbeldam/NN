@@ -1,111 +1,154 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
+from base import BaseModel
+from utils.helpers import initialize_weights
+from itertools import chain
 
-class BasicBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1):
-        super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+class PSPModule(nn.Module):
+    # In the original inmplementation they use precise RoI pooling 
+    # Instead of using adaptative average pooling
+    def __init__(self, in_channels, bin_sizes=[1, 2, 4, 6]):
+        super(PSPModule, self).__init__()
+        out_channels = in_channels // len(bin_sizes)
+        self.stages = nn.ModuleList([self._make_stages(in_channels, out_channels, b_s) 
+                                                        for b_s in bin_sizes])
+        self.bottleneck = nn.Sequential(
+            nn.Conv2d(in_channels+(out_channels * len(bin_sizes)), in_channels, 
+                                    kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1)
+        )
 
-        # **Fix: Add a 1x1 convolution if in_channels != out_channels**
-        self.downsample = None
-        if in_channels != out_channels:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels)
-            )
-
-    def forward(self, x):
-        identity = x
-        if self.downsample is not None:
-            identity = self.downsample(x)  # Adjust identity to match out_channels
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        
-        out += identity  # Now identity and out match in channels
-        return self.relu(out)
+    def _make_stages(self, in_channels, out_channels, bin_sz):
+        prior = nn.AdaptiveAvgPool2d(output_size=bin_sz)
+        conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        bn = nn.BatchNorm2d(out_channels)
+        relu = nn.ReLU(inplace=True)
+        return nn.Sequential(prior, conv, bn, relu)
+    
+    def forward(self, features):
+        h, w = features.size()[2], features.size()[3]
+        pyramids = [features]
+        pyramids.extend([F.interpolate(stage(features), size=(h, w), mode='bilinear', 
+                                        align_corners=True) for stage in self.stages])
+        output = self.bottleneck(torch.cat(pyramids, dim=1))
+        return output
 
 class Model(nn.Module):
-    def __init__(self, in_channels=3, n_classes=19):
+    def __init__(self, in_channels=3, output_stride=19, backbone='resnet101', pretrained=True):
         super(Model, self).__init__()
-
-        # Stem
-        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
-
-        # Stage 1
-        self.layer1 = self._make_layer(64, 32, 4)
+        model = getattr(models, backbone)(pretrained)
+        if not pretrained or in_channels != 3:
+            self.initial = nn.Sequential(
+                nn.Conv2d(in_channels, 64, 7, stride=2, padding=3, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            )
+            initialize_weights(self.initial)
+        else:
+            self.initial = nn.Sequential(*list(model.children())[:4])
         
-        # Stage 2
-        self.transition1 = self._make_transition([64], [32, 64])  # Pass as lists
-        self.stage2 = nn.ModuleList([
-            self._make_layer(32, 32, 4),
-            self._make_layer(64, 64, 4)
-        ])
-        
-        # Stage 3
-        self.transition2 = self._make_transition([32, 64], [32, 64, 128])  # Pass as lists
-        self.stage3 = nn.ModuleList([
-            self._make_layer(32, 32, 4),
-            self._make_layer(64, 64, 4),
-            self._make_layer(128, 128, 4)
-        ])
-        
-        # Stage 4
-        self.transition3 = self._make_transition([32, 64, 128], [32, 64, 128, 256])  # Pass as lists
-        self.stage4 = nn.ModuleList([
-            self._make_layer(32, 32, 4),
-            self._make_layer(64, 64, 4),
-            self._make_layer(128, 128, 4),
-            self._make_layer(256, 256, 4)
-        ])
+        self.layer1 = model.layer1
+        self.layer2 = model.layer2
+        self.layer3 = model.layer3
+        self.layer4 = model.layer4
 
-        # Final classifier
-        self.final_layer = nn.Conv2d(32, n_classes, kernel_size=1)
+        if output_stride == 16: s3, s4, d3, d4 = (2, 1, 1, 2)
+        elif output_stride == 8: s3, s4, d3, d4 = (1, 1, 2, 4)
 
-    def _make_layer(self, in_channels, out_channels, blocks):
-        layers = [BasicBlock(in_channels, out_channels)]
-        for _ in range(1, blocks):
-            layers.append(BasicBlock(out_channels, out_channels))
-        return nn.Sequential(*layers)
+        if output_stride == 8: 
+            for n, m in self.layer3.named_modules():
+                if 'conv1' in n and (backbone == 'resnet34' or backbone == 'resnet18'):
+                    m.dilation, m.padding, m.stride = (d3,d3), (d3,d3), (s3,s3)
+                elif 'conv2' in n:
+                    m.dilation, m.padding, m.stride = (d3,d3), (d3,d3), (s3,s3)
+                elif 'downsample.0' in n:
+                    m.stride = (s3, s3)
 
-    def _make_transition(self, prev_channels_list, new_channels_list):
-        layers = []
-        # Ensure each transition layer is correctly mapped
-        for prev_channels, new_channels in zip(prev_channels_list, new_channels_list):
-            # Add a convolutional layer to match the number of channels
-            layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
-        return nn.ModuleList(layers)
+        for n, m in self.layer4.named_modules():
+            if 'conv1' in n and (backbone == 'resnet34' or backbone == 'resnet18'):
+                m.dilation, m.padding, m.stride = (d4,d4), (d4,d4), (s4,s4)
+            elif 'conv2' in n:
+                m.dilation, m.padding, m.stride = (d4,d4), (d4,d4), (s4,s4)
+            elif 'downsample.0' in n:
+                m.stride = (s4, s4)
 
     def forward(self, x):
-        # Stem
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        
-        # Stage 1
-        x = self.layer1(x)
-        
-        # Stage 2
-        x_list = [t(x) for t in self.transition1]  # Transition 1 outputs
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]  # Stage 2 outputs
-        
-        # Stage 3
-        x_list = [t(x_list[i]) for i, t in enumerate(self.transition2)] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]  # Stage 3 outputs
-        
-        # Stage 4
-        x_list = [t(x_list[i]) for i, t in enumerate(self.transition3)] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]  # Stage 4 outputs
+        x = self.initial(x)
+        x1 = self.layer1(x)
+        x2 = self.layer2(x1)
+        x3 = self.layer3(x2)
+        x4 = self.layer4(x3)
 
-        # Final output
-        out = self.final_layer(x_list[0])  # Use the highest resolution branch
-        return out
+        return [x1, x2, x3, x4]
+
+def up_and_add(x, y):
+    return F.interpolate(x, size=(y.size(2), y.size(3)), mode='bilinear', align_corners=True) + y
+
+class FPN_fuse(nn.Module):
+    def __init__(self, feature_channels=[256, 512, 1024, 2048], fpn_out=256):
+        super(FPN_fuse, self).__init__()
+        assert feature_channels[0] == fpn_out
+        self.conv1x1 = nn.ModuleList([nn.Conv2d(ft_size, fpn_out, kernel_size=1)
+                                    for ft_size in feature_channels[1:]])
+        self.smooth_conv =  nn.ModuleList([nn.Conv2d(fpn_out, fpn_out, kernel_size=3, padding=1)] 
+                                    * (len(feature_channels)-1))
+        self.conv_fusion = nn.Sequential(
+            nn.Conv2d(len(feature_channels)*fpn_out, fpn_out, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(fpn_out),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, features):
+        
+        features[1:] = [conv1x1(feature) for feature, conv1x1 in zip(features[1:], self.conv1x1)]
+        P = [up_and_add(features[i], features[i-1]) for i in reversed(range(1, len(features)))]
+        P = [smooth_conv(x) for smooth_conv, x in zip(self.smooth_conv, P)]
+        P = list(reversed(P))
+        P.append(features[-1]) #P = [P1, P2, P3, P4]
+        H, W = P[0].size(2), P[0].size(3)
+        P[1:] = [F.interpolate(feature, size=(H, W), mode='bilinear', align_corners=True) for feature in P[1:]]
+
+        x = self.conv_fusion(torch.cat((P), dim=1))
+        return x
+
+class UperNet(BaseModel):
+    # Implementing only the object path
+    def __init__(self, num_classes, in_channels=3, backbone='resnet101', pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False, **_):
+        super(UperNet, self).__init__()
+
+        if backbone == 'resnet34' or backbone == 'resnet18':
+            feature_channels = [64, 128, 256, 512]
+        else:
+            feature_channels = [256, 512, 1024, 2048]
+        self.backbone = ResNet(in_channels, backbone=backbone, pretrained=pretrained)
+        self.PPN = PSPModule(feature_channels[-1])
+        self.FPN = FPN_fuse(feature_channels, fpn_out=fpn_out)
+        self.head = nn.Conv2d(fpn_out, num_classes, kernel_size=3, padding=1)
+        if freeze_bn: self.freeze_bn()
+        if freeze_backbone: 
+            set_trainable([self.backbone], False)
+
+    def forward(self, x):
+        input_size = (x.size()[2], x.size()[3])
+
+        features = self.backbone(x)
+        features[-1] = self.PPN(features[-1])
+        x = self.head(self.FPN(features))
+
+        x = F.interpolate(x, size=input_size, mode='bilinear')
+        return x
+
+    def get_backbone_params(self):
+        return self.backbone.parameters()
+
+    def get_decoder_params(self):
+        return chain(self.PPN.parameters(), self.FPN.parameters(), self.head.parameters())
+
+    def freeze_bn(self):
+        for module in self.modules():
+            if isinstance(module, nn.BatchNorm2d): module.eval()
