@@ -84,3 +84,22 @@ class Model(nn.Module):
             layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
         return nn.ModuleList(layers)
 
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.layer1(x)
+        
+        x_list = [t(x) for t in self.transition1]
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]
+        
+        x_list = [t(x_list[-1]) for t in self.transition2] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]
+        
+        x_list = [t(x_list[-1]) for t in self.transition3] + x_list
+        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]
+
+        out = self.final_layer(x_list[0])  # Use the highest resolution branch
+        return out
+
+
