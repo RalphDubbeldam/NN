@@ -32,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_encode import Model
+from unet_baseline_encode import (Model, ResNet)
 
 
 # Mapping class IDs to train IDs
@@ -160,7 +160,7 @@ def main(args):
     )
 
     # Define the model
-    model = Model(
+    model = ResNet(
         in_channels=3,  # RGB images
         output_stride=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
@@ -188,8 +188,6 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            # Resize outputs to match the size of labels
-            outputs = F.interpolate(outputs, size=labels.shape[2:], mode='bilinear', align_corners=False)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
