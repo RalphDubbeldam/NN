@@ -36,7 +36,7 @@ class BasicBlock(nn.Module):
 class Model(nn.Module):
     def __init__(self, in_channels=3, n_classes=19):
         super(Model, self).__init__()
-        
+
         # Stem
         self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
@@ -46,14 +46,14 @@ class Model(nn.Module):
         self.layer1 = self._make_layer(64, 32, 4)
         
         # Stage 2
-        self.transition1 = self._make_transition(32, [32, 64])
+        self.transition1 = self._make_transition([64], [32, 64])  # Pass as lists
         self.stage2 = nn.ModuleList([
             self._make_layer(32, 32, 4),
             self._make_layer(64, 64, 4)
         ])
         
         # Stage 3
-        self.transition2 = self._make_transition([32, 64], [32, 64, 128])
+        self.transition2 = self._make_transition([32, 64], [32, 64, 128])  # Pass as lists
         self.stage3 = nn.ModuleList([
             self._make_layer(32, 32, 4),
             self._make_layer(64, 64, 4),
@@ -61,7 +61,7 @@ class Model(nn.Module):
         ])
         
         # Stage 4
-        self.transition3 = self._make_transition([32, 64, 128], [32, 64, 128, 256])
+        self.transition3 = self._make_transition([32, 64, 128], [32, 64, 128, 256])  # Pass as lists
         self.stage4 = nn.ModuleList([
             self._make_layer(32, 32, 4),
             self._make_layer(64, 64, 4),
@@ -84,28 +84,3 @@ class Model(nn.Module):
             layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
         return nn.ModuleList(layers)
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.layer1(x)
-        
-        # Process stage 2
-        x_list = [t(x) for t in self.transition1]
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]
-        
-        # Process stage 3
-        x_list = [t(x_list[i]) for i, t in enumerate(self.transition2)] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]
-        
-        # Process stage 4
-        x_list = [t(x_list[i]) for i, t in enumerate(self.transition3)] + x_list
-        x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]
-
-        # Merge all branches (fusion)
-        x = torch.cat(x_list, dim=1)  # Concatenate all branches along channel axis
-        x = torch.mean(x, dim=[2, 3], keepdim=True)  # Global average pooling
-
-        # Final classification layer
-        out = self.final_layer(x)
-        return out
