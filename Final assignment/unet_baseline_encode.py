@@ -32,7 +32,6 @@ class BasicBlock(nn.Module):
         out += identity  # Now identity and out match in channels
         return self.relu(out)
 
-
 class Model(nn.Module):
     def __init__(self, in_channels=3, n_classes=19):
         super(Model, self).__init__()
@@ -80,26 +79,33 @@ class Model(nn.Module):
 
     def _make_transition(self, prev_channels_list, new_channels_list):
         layers = []
+        # Ensure each transition layer is correctly mapped
         for prev_channels, new_channels in zip(prev_channels_list, new_channels_list):
             layers.append(nn.Conv2d(prev_channels, new_channels, kernel_size=3, stride=1, padding=1, bias=False))
         return nn.ModuleList(layers)
 
     def forward(self, x):
+        # Stem
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+        
+        # Stage 1
         x = self.layer1(x)
         
+        # Stage 2
         x_list = [t(x) for t in self.transition1]
         x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage2)]
         
+        # Stage 3
         x_list = [t(x_list[-1]) for t in self.transition2] + x_list
         x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage3)]
         
+        # Stage 4
         x_list = [t(x_list[-1]) for t in self.transition3] + x_list
         x_list = [stage(x_list[i]) for i, stage in enumerate(self.stage4)]
 
+        # Final output
         out = self.final_layer(x_list[0])  # Use the highest resolution branch
         return out
-
 
