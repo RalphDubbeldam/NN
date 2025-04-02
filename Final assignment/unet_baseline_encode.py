@@ -79,6 +79,15 @@ class Model(nn.Module):
             elif 'downsample.0' in n:
                 m.stride = (s4, s4)
 
+    def forward(self, x):
+        x = self.initial(x)
+        x1 = self.layer1(x)
+        x2 = self.layer2(x1)
+        x3 = self.layer3(x2)
+        x4 = self.layer4(x3)
+
+        return [x1, x2, x3, x4]
+
 
 def up_and_add(x, y):
     return F.interpolate(x, size=(y.size(2), y.size(3)), mode='bilinear', align_corners=True) + y
