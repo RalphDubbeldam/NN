@@ -54,8 +54,13 @@ class Model(nn.Module):
         self.layer3 = model.layer3
         self.layer4 = model.layer4
 
-        if output_stride == 16: s3, s4, d3, d4 = (2, 1, 1, 2)
-        elif output_stride == 8: s3, s4, d3, d4 = (1, 1, 2, 4)
+        # Set default values for d4, d3, s4, and s3
+        d3, d4, s3, s4 = 1, 1, 1, 1
+
+        if output_stride == 16: 
+            s3, s4, d3, d4 = (2, 1, 1, 2)
+        elif output_stride == 8: 
+            s3, s4, d3, d4 = (1, 1, 2, 4)
 
         if output_stride == 8: 
             for n, m in self.layer3.named_modules():
@@ -74,14 +79,6 @@ class Model(nn.Module):
             elif 'downsample.0' in n:
                 m.stride = (s4, s4)
 
-    def forward(self, x):
-        x = self.initial(x)
-        x1 = self.layer1(x)
-        x2 = self.layer2(x1)
-        x3 = self.layer3(x2)
-        x4 = self.layer4(x3)
-
-        return [x1, x2, x3, x4]
 
 def up_and_add(x, y):
     return F.interpolate(x, size=(y.size(2), y.size(3)), mode='bilinear', align_corners=True) + y
