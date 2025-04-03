@@ -187,6 +187,8 @@ def main(args):
             labels = labels.long().squeeze(1)  # Remove channel dimension
 
             optimizer.zero_grad()
+            print(f"Model is on: {next(model.parameters()).device}")
+            print(f"Input tensor is on: {images.device}")
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
