@@ -232,20 +232,41 @@ class ResNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-    def forward(self, x):   # (batch_size, 3, 256, 256)
-        x1 = self.conv1(x)                # (batch_size, 64, 128, 256)
-        x =  self.bn1(x1)
-        x =  self.relu(x)
-        x =  self.maxpool(x)              # (batch_size, 64, 64, 64)
-        x2 = self.layer1(x)               # (batch_size, 64, 64, 64)
-        x3 = self.layer2(x2)              # (batch_size, 128, 32, 32)
-        x4 = self.layer3(x3)              # (batch_size, 256, 32, 32)
-        x5 = self.layer4(x4)              # (batch_size, 512, 32, 32)
+    def _decoder_block(self, in_channels, skip_channels, out_channels):
+        """Decoder block with skip connection and refinement convolutions."""
+        return nn.Sequential(
+            nn.Conv2d(in_channels + skip_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
-        # Decoder path (upsampling with skip connections)
-        x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
-        x = self.upconv3(x)               # (batch_size, 128, 128, 128)
-        x = self.upconv2(x)               # (batch_size, 64, 256, 256)
-        x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
+    def forward(self, x):
+        """Forward pass with improved decoder using skip connections."""
+        # Encoder
+        x1 = self.conv1(x)    # (batch, 128, 128, 128) or (batch, 64, 128, 128) depending on deep_base
+        x1 = self.bn1(x1)
+        x1 = self.relu(x1)
+        x1 = self.maxpool(x1) # (batch, 64, 64, 64)
+        x2 = self.layer1(x1)  # (batch, 64, 64, 64)
+        x3 = self.layer2(x2)  # (batch, 128, 32, 32)
+        x4 = self.layer3(x3)  # (batch, 256, 32, 32)
+        x5 = self.layer4(x4)  # (batch, 512, 32, 32)
 
-        return x  # (batch_size, num_classes, 256, 256)
+        # Decoder with skip connections
+        x = F.interpolate(x5, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 512, 64, 64)
+        x = self._decoder_block(512, x4.shape[1], 256)(torch.cat([x, x4], dim=1))
+
+        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 256, 128, 128)
+        x = self._decoder_block(256, x3.shape[1], 128)(torch.cat([x, x3], dim=1))
+
+        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 128, 256, 256)
+        x = self._decoder_block(128, x2.shape[1], 64)(torch.cat([x, x2], dim=1))
+
+        # Final segmentation output
+        x = self.final_conv(x)  # (batch, num_classes, 256, 256)
+
+        return x
+
