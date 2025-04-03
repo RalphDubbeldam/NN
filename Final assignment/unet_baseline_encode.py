@@ -222,5 +222,3 @@ class ResNet(nn.Module):
         x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
 
         return x  # (batch_size, num_classes, 256, 256)
-
-        return x5  # (batch_size, num_classes, 512, 512)
