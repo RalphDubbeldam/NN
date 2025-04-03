@@ -246,27 +246,31 @@ class ResNet(nn.Module):
     def forward(self, x):
         """Forward pass with improved decoder using skip connections."""
         # Encoder
-        x1 = self.conv1(x)    # (batch, 128, 128, 128) or (batch, 64, 128, 128) depending on deep_base
+        x1 = self.conv1(x)   # (batch, 128, 128, 128) or (batch, 64, 128, 128) depending on deep_base
         x1 = self.bn1(x1)
         x1 = self.relu(x1)
-        x1 = self.maxpool(x1) # (batch, 64, 64, 64)
+        x1 = self.maxpool(x1)  # (batch, 64, 64, 64)
         x2 = self.layer1(x1)  # (batch, 64, 64, 64)
         x3 = self.layer2(x2)  # (batch, 128, 32, 32)
         x4 = self.layer3(x3)  # (batch, 256, 32, 32)
         x5 = self.layer4(x4)  # (batch, 512, 32, 32)
 
-        # Decoder with skip connections
+        # Decoder with spatially matched skip connections
         x = F.interpolate(x5, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 512, 64, 64)
-        x = self._decoder_block(512, x4.shape[1], 256)(torch.cat([x, x4], dim=1))
+        x4_upsampled = F.interpolate(x4, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 256, 64, 64)
+        x = self._decoder_block(512, 256, 256)(torch.cat([x, x4_upsampled], dim=1))
 
         x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 256, 128, 128)
-        x = self._decoder_block(256, x3.shape[1], 128)(torch.cat([x, x3], dim=1))
+        x3_upsampled = F.interpolate(x3, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 128, 128, 128)
+        x = self._decoder_block(256, 128, 128)(torch.cat([x, x3_upsampled], dim=1))
 
         x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 128, 256, 256)
-        x = self._decoder_block(128, x2.shape[1], 64)(torch.cat([x, x2], dim=1))
+        x2_upsampled = F.interpolate(x2, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 64, 256, 256)
+        x = self._decoder_block(128, 64, 64)(torch.cat([x, x2_upsampled], dim=1))
 
         # Final segmentation output
         x = self.final_conv(x)  # (batch, num_classes, 256, 256)
 
         return x
+
 
