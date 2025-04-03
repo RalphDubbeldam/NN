@@ -258,16 +258,17 @@ class ResNet(nn.Module):
         # Decoder with spatially matched skip connections
         x = F.interpolate(x5, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 512, 64, 64)
         x4_upsampled = F.interpolate(x4, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 256, 64, 64)
-        print(f"_decoder_block is on: {next(self._decoder_block(512, x4.shape[1], 256).parameters()).device}")
-
+        x4_upsampled = x4_upsampled.to(x.device)
         x = self._decoder_block(512, 256, 256)(torch.cat([x, x4_upsampled], dim=1))
 
         x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 256, 128, 128)
         x3_upsampled = F.interpolate(x3, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 128, 128, 128)
+        x3_upsampled = x3_upsampled.to(x.device)
         x = self._decoder_block(256, 128, 128)(torch.cat([x, x3_upsampled], dim=1))
 
         x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 128, 256, 256)
         x2_upsampled = F.interpolate(x2, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 64, 256, 256)
+        x2_upsampled = x2_upsampled.to(x.device)
         x = self._decoder_block(128, 64, 64)(torch.cat([x, x2_upsampled], dim=1))
 
         # Final segmentation output
