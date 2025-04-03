@@ -161,6 +161,14 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
 
+        self.upconv4 = self._upconv_block(512, 256)  # Upsample from 32x32 to 64x64
+        self.upconv3 = self._upconv_block(256, 128)  # Upsample from 64x64 to 128x128
+        self.upconv2 = self._upconv_block(128, 64)   # Upsample from 128x128 to 256x256
+
+        # Final layer to output segmentation map
+        self.final_conv = nn.Conv2d(128, num_classes, kernel_size=1)  # (64 + 64) channels from skip connections
+
+
         if dilated:
             self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2, norm_layer=norm_layer)
             if multi_grid:
@@ -171,13 +179,8 @@ class ResNet(nn.Module):
             self.layer3 = self._make_layer(block, 256, layers[2], stride=2, norm_layer=norm_layer)
             self.layer4 = self._make_layer(block, 512, layers[3], stride=2, norm_layer=norm_layer)
 
-        # Decoder: Upsampling blocks
-        self.up1 = Up(512, 256)  # Upsample from 32x32 to 64x64
-        self.up2 = Up(256, 128)  # Upsample from 64x64 to 128x128
-        self.up3 = Up(128, 64)   # Upsample from 128x128 to 256x256
-
-        # Final layer to output segmentation map
-        self.outc = nn.Conv2d(64, num_classes, kernel_size=1)
+        # Remove FC layer, replace with segmentation head
+        self.segmentation_head = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=1)
 
         # Initialize weights
         for m in self.modules():
@@ -220,6 +223,14 @@ class ResNet(nn.Module):
                                     norm_layer=norm_layer))
 
         return nn.Sequential(*layers)
+    
+    def _upconv_block(self, in_channels, out_channels):
+        """Create an upconvolutional block with Conv2D and BatchNorm."""
+        return nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
 
     def forward(self, x):   # (batch_size, 3, 256, 256)
         x1 = self.conv1(x)                # (batch_size, 64, 128, 256)
@@ -231,13 +242,20 @@ class ResNet(nn.Module):
         x4 = self.layer3(x3)              # (batch_size, 256, 32, 32)
         x5 = self.layer4(x4)              # (batch_size, 512, 32, 32)
 
-        # Decoder part (upsampling)
-        x = self.up1(x5, x4)              # (batch_size, 256, 64, 64)
-        x = self.up2(x, x3)               # (batch_size, 128, 128, 128)
-        x = self.up3(x, x2)               # (batch_size, 64, 256, 256)
+        # Decoder path (upsampling with skip connections)
+        x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
+        x4_up = F.interpolate(x4, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 256, 64, 64)
+        x = torch.cat([x, x4_up], dim=1)   # (batch_size, 512, 64, 64) [Skip connection from x4]
         
-        # Output segmentation map
-        logits = self.outc(x)             # (batch_size, num_classes, 256, 256)
+        x = self.upconv3(x)               # (batch_size, 128, 128, 128)
+        x3_up = F.interpolate(x3, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 128, 128, 128)
+        x = torch.cat([x, x3_up], dim=1)   # (batch_size, 256, 128, 128) [Skip connection from x3]
         
-        return logits  # (batch_size, num_classes, 256, 256)
+        x = self.upconv2(x)               # (batch_size, 64, 256, 256)
+        x2_up = F.interpolate(x2, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 64, 256, 256)
+        x = torch.cat([x, x2_up], dim=1)   # (batch_size, 128, 256, 256) [Skip connection from x2]
 
+        # Final segmentation output
+        x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
+
+        return x  # (batch_size, num_classes, 256, 256)
