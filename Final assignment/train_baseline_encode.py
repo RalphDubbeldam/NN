@@ -164,6 +164,7 @@ def main(args):
     model = ResNet(BasicBlock, [2, 2, 2, 2], deep_base=False, num_classes=19)
     #model = ResNet(Bottleneck, [3, 4, 6, 3], deep_base=False, num_classes=19)
     model = model.to(device)
+    print(f"Model is on: {next(model.parameters()).device}")
 
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
