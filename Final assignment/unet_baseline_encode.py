@@ -245,7 +245,7 @@ class ResNet(nn.Module):
         # Decoder path (upsampling with skip connections)
         x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
         x = self.upconv3(x)               # (batch_size, 128, 128, 128)
-        x = self.upconv2(x)               # (batch_size, 64, 256, 256)
+        #x = self.upconv2(x)               # (batch_size, 64, 256, 256)
         x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
 
         return x  # (batch_size, num_classes, 256, 256)
