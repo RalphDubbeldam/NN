@@ -258,6 +258,8 @@ class ResNet(nn.Module):
         # Decoder with spatially matched skip connections
         x = F.interpolate(x5, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 512, 64, 64)
         x4_upsampled = F.interpolate(x4, size=x.shape[2:], mode='bilinear', align_corners=True)  # (batch, 256, 64, 64)
+        print(f"_decoder_block is on: {next(self._decoder_block(512, x4.shape[1], 256).parameters()).device}")
+
         x = self._decoder_block(512, 256, 256)(torch.cat([x, x4_upsampled], dim=1))
 
         x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)  # (batch, 256, 128, 128)
