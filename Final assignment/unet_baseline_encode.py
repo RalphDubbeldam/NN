@@ -4,6 +4,8 @@
 
 import math
 import torch.nn as nn
+import torch.nn.functional as F
+import math
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -99,15 +101,14 @@ class Bottleneck(nn.Module):
 
         return out
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
 
 class ResNet(nn.Module):
-    """ResNet adapted for Semantic Segmentation with a fully convolutional output."""
-
+    """ResNet adapted for Semantic Segmentation with skip connections and learnable upsampling."""
+    
     def __init__(self, block, layers, num_classes, dilated=True, multi_grid=False,
                  deep_base=True, norm_layer=nn.BatchNorm2d):
         super(ResNet, self).__init__()
@@ -143,12 +144,20 @@ class ResNet(nn.Module):
             self.layer3 = self._make_layer(block, 256, layers[2], stride=2, norm_layer=norm_layer)
             self.layer4 = self._make_layer(block, 512, layers[3], stride=2, norm_layer=norm_layer)
 
-        # Remove FC layer, replace with segmentation head
+        # Segmentation Head
         self.segmentation_head = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=1)
+
+        # Learnable Upsampling Layers
+        self.upconv3 = nn.ConvTranspose2d(512 * block.expansion, 256 * block.expansion, kernel_size=4, stride=2, padding=1)
+        self.upconv2 = nn.ConvTranspose2d(256 * block.expansion, 128 * block.expansion, kernel_size=4, stride=2, padding=1)
+        self.upconv1 = nn.ConvTranspose2d(128 * block.expansion, 64 * block.expansion, kernel_size=4, stride=2, padding=1)
+
+        # Final segmentation layer
+        self.final_up = nn.ConvTranspose2d(64 * block.expansion, num_classes, kernel_size=4, stride=2, padding=1)
 
         # Initialize weights
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, norm_layer):
@@ -194,14 +203,21 @@ class ResNet(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x1 = self.layer1(x)  # Skip connection 1
+        x2 = self.layer2(x1) # Skip connection 2
+        x3 = self.layer3(x2) # Skip connection 3
+        x4 = self.layer4(x3) # Bottleneck
 
-        x = self.segmentation_head(x)  # (batch_size, num_classes, H/stride, W/stride)
+        # Segmentation head
+        x = self.segmentation_head(x4)
 
-        # Optional: Upsample to match input size
-        x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)
+        # Upsampling with skip connections
+        x = self.upconv3(x) + x3  # Merge with layer3
+        x = self.upconv2(x) + x2  # Merge with layer2
+        x = self.upconv1(x) + x1  # Merge with layer1
+
+        # Final upsampling
+        x = self.final_up(x)
 
         return x  # (batch_size, num_classes, H, W)
+
