@@ -5,7 +5,7 @@
 import math
 import torch.nn as nn
 import torch.nn.functional as F
-import math
+import torch
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -129,10 +129,13 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
 
-        self.upconv4 = self._upconv_block(512 * block.expansion, 256)
-        self.upconv3 = self._upconv_block(256, 128)
-        self.upconv2 = self._upconv_block(128, 64)
-        self.upconv1 = nn.Conv2d(64, num_classes, kernel_size=1)  
+        self.upconv4 = self._upconv_block(512, 256)  # Upsample from 32x32 to 64x64
+        self.upconv3 = self._upconv_block(256, 128)  # Upsample from 64x64 to 128x128
+        self.upconv2 = self._upconv_block(128, 64)   # Upsample from 128x128 to 256x256
+
+        # Final layer to output segmentation map
+        self.final_conv = nn.Conv2d(128, num_classes, kernel_size=1)  # (64 + 64) channels from skip connections
+
 
         if dilated:
             self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2, norm_layer=norm_layer)
@@ -197,22 +200,27 @@ class ResNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-    def forward(self, x):   # (batch_size, 3, 512, 512)
-        x1 = self.conv1(x)   # (batch_size, 128, 256, 256) if deep_base else (batch_size, 64, 256, 256)
-        x = self.bn1(x1)
-        x = self.relu(x)
-        x = self.maxpool(x) # (batch_size, 128, 128, 128) if deep_base else (batch_size, 64, 128, 128)
-        x2 = self.layer1(x)  # (batch_size, 64 * expansion, 128, 128)
-        x3 = self.layer2(x2)  # (batch_size, 128 * expansion, 64, 64)
-        x4 = self.layer3(x3)  # (batch_size, 256 * expansion, 64, 64) if dilated else (batch_size, 256 * expansion, 32, 32)
-        x5 = self.layer4(x4)  # (batch_size, 512 * expansion, 64, 64) if dilated else (batch_size, 512 * expansion, 16, 16)
+    def forward(self, x):   # (batch_size, 3, 256, 256)
+        x1 = self.conv1(x)                # (batch_size, 64, 128, 256)
+        x =  self.bn1(x1)
+        x =  self.relu(x)
+        x =  self.maxpool(x)              # (batch_size, 64, 64, 64)
+        x2 = self.layer1(x)               # (batch_size, 64, 64, 64)
+        x3 = self.layer2(x2)              # (batch_size, 128, 32, 32)
+        x4 = self.layer3(x3)              # (batch_size, 256, 32, 32)
+        x5 = self.layer4(x4)              # (batch_size, 512, 32, 32)
 
-        x = self.upconv4(x5)  # (batch_size, 256, 128, 128)
-        x = x + x4  # Skip connection from layer3 (ResNet output)
-        x = self.upconv3(x)  # (batch_size, 128, 256, 256)
-        x = x + x3  # Skip connection from layer2
-        x = self.upconv2(x)  # (batch_size, 64, 512, 512)
-        x = x + x2  # Skip connection from layer1
-        x = self.upconv1(x)  # (batch_size, num_classes, 512, 512)
+        # Decoder path (upsampling with skip connections)
+        x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
+        x = torch.cat([x, x4], dim=1)     # (batch_size, 512, 64, 64) [Skip connection from x4]
+        x = self.upconv3(x)               # (batch_size, 128, 128, 128)
+        x = torch.cat([x, x3], dim=1)     # (batch_size, 256, 128, 128) [Skip connection from x3]
+        x = self.upconv2(x)               # (batch_size, 64, 256, 256)
+        x = torch.cat([x, x2], dim=1)     # (batch_size, 128, 256, 256) [Skip connection from x2]
 
-        return x  # (batch_size, num_classes, 512, 512)
+        # Final segmentation output
+        x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
+
+        return x  # (batch_size, num_classes, 256, 256)
+
+        return x5  # (batch_size, num_classes, 512, 512)

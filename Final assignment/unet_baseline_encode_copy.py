@@ -185,7 +185,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):               # (batch_size, 3, 256, 256)
-        x = self.conv1(x)               # (batch_size, 64, 128, 256)
+        x = self.conv1(x)               # (batch_size, 64, 128, 128)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)             # (batch_size, 64, 64, 64)
