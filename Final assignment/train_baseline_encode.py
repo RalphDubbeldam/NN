@@ -189,6 +189,7 @@ def main(args):
             optimizer.zero_grad()
             print(f"Model is on: {next(model.parameters()).device}")
             print(f"Input tensor is on: {images.device}")
+            print(f"Model weights are on: {model.final_conv.weight.device}")
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
