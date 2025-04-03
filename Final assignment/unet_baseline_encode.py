@@ -212,11 +212,16 @@ class ResNet(nn.Module):
 
         # Decoder path (upsampling with skip connections)
         x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
-        x = torch.cat([x, x4], dim=1)     # (batch_size, 512, 64, 64) [Skip connection from x4]
+        x4_up = F.interpolate(x4, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 256, 64, 64)
+        x = torch.cat([x, x4_up], dim=1)   # (batch_size, 512, 64, 64) [Skip connection from x4]
+        
         x = self.upconv3(x)               # (batch_size, 128, 128, 128)
-        x = torch.cat([x, x3], dim=1)     # (batch_size, 256, 128, 128) [Skip connection from x3]
+        x3_up = F.interpolate(x3, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 128, 128, 128)
+        x = torch.cat([x, x3_up], dim=1)   # (batch_size, 256, 128, 128) [Skip connection from x3]
+        
         x = self.upconv2(x)               # (batch_size, 64, 256, 256)
-        x = torch.cat([x, x2], dim=1)     # (batch_size, 128, 256, 256) [Skip connection from x2]
+        x2_up = F.interpolate(x2, size=x.shape[2:], mode='bilinear', align_corners=False)  # (batch_size, 64, 256, 256)
+        x = torch.cat([x, x2_up], dim=1)   # (batch_size, 128, 256, 256) [Skip connection from x2]
 
         # Final segmentation output
         x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
