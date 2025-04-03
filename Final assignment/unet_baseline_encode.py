@@ -100,18 +100,19 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
-    """Dilated Pre-trained ResNet Model, which preduces the stride of 8 featuremaps at conv5.
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
 
-    Reference:
-        - He, Kaiming, et al. "Deep residual learning for image recognition." CVPR. 2016.
-        - Yu, Fisher, and Vladlen Koltun. "Multi-scale context aggregation by dilated convolutions."
-    """
-    # pylint: disable=unused-variable
-    def __init__(self, block, layers, num_classes=1000, dilated=True, multi_grid=False,
+class ResNetSegmentation(nn.Module):
+    """ResNet adapted for Semantic Segmentation with a fully convolutional output."""
+
+    def __init__(self, block, layers, num_classes, dilated=True, multi_grid=False,
                  deep_base=True, norm_layer=nn.BatchNorm2d):
+        super(ResNetSegmentation, self).__init__()
+
         self.inplanes = 128 if deep_base else 64
-        super(ResNet, self).__init__()
         if deep_base:
             self.conv1 = nn.Sequential(
                 nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1, bias=False),
@@ -123,31 +124,29 @@ class ResNet(nn.Module):
                 nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False),
             )
         else:
-            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                                   bias=False)
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
         self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
-        if dilated:
-            self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
-                                           dilation=2, norm_layer=norm_layer)
-            if multi_grid:
-                self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
-                                               dilation=4, norm_layer=norm_layer,
-                                               multi_grid=True)
-            else:
-                self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
-                                               dilation=4, norm_layer=norm_layer)
-        else:
-            self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                           norm_layer=norm_layer)
-            self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                           norm_layer=norm_layer)
-        self.avgpool = nn.AvgPool2d(7, stride=1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
+        if dilated:
+            self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2, norm_layer=norm_layer)
+            if multi_grid:
+                self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4, norm_layer=norm_layer, multi_grid=True)
+            else:
+                self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4, norm_layer=norm_layer)
+        else:
+            self.layer3 = self._make_layer(block, 256, layers[2], stride=2, norm_layer=norm_layer)
+            self.layer4 = self._make_layer(block, 512, layers[3], stride=2, norm_layer=norm_layer)
+
+        # Remove FC layer, replace with segmentation head
+        self.segmentation_head = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=1)
+
+        # Initialize weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -160,8 +159,7 @@ class ResNet(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(self.inplanes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
                 norm_layer(planes * block.expansion),
             )
 
@@ -201,8 +199,9 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        x = self.segmentation_head(x)  # (batch_size, num_classes, H/stride, W/stride)
 
-        return x
+        # Optional: Upsample to match input size
+        x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)
+
+        return x  # (batch_size, num_classes, H, W)
