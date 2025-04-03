@@ -190,22 +190,22 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-def forward(self, x):   # (batch_size, 3, 512, 512)
-    x = self.conv1(x)   # (batch_size, 128, 256, 256) if deep_base else (batch_size, 64, 256, 256)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x1 = self.maxpool(x) # (batch_size, 128, 128, 128) if deep_base else (batch_size, 64, 128, 128)
-    x2 = self.layer1(x1)  # (batch_size, 64 * expansion, 128, 128)
-    x3 = self.layer2(x2)  # (batch_size, 128 * expansion, 64, 64)
-    x4 = self.layer3(x3)  # (batch_size, 256 * expansion, 64, 64) if dilated else (batch_size, 256 * expansion, 32, 32)
-    x5 = self.layer4(x4)  # (batch_size, 512 * expansion, 64, 64) if dilated else (batch_size, 512 * expansion, 16, 16)
-    
-    x = self.up1(x5, x4) 
-    x = self.up2(x, x3)  
-    x = self.up3(x, x2)  
-    x = self.up4(x, x1)  
-    logits = self.outc(x)
-    return logits  
+    def forward(self, x):   # (batch_size, 3, 512, 512)
+        x = self.conv1(x)   # (batch_size, 128, 256, 256) if deep_base else (batch_size, 64, 256, 256)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x1 = self.maxpool(x) # (batch_size, 128, 128, 128) if deep_base else (batch_size, 64, 128, 128)
+        x2 = self.layer1(x1)  # (batch_size, 64 * expansion, 128, 128)
+        x3 = self.layer2(x2)  # (batch_size, 128 * expansion, 64, 64)
+        x4 = self.layer3(x3)  # (batch_size, 256 * expansion, 64, 64) if dilated else (batch_size, 256 * expansion, 32, 32)
+        x5 = self.layer4(x4)  # (batch_size, 512 * expansion, 64, 64) if dilated else (batch_size, 512 * expansion, 16, 16)
+        
+        x = self.up1(x5, x4) 
+        x = self.up2(x, x3)  
+        x = self.up3(x, x2)  
+        x = self.up4(x, x1)  
+        logits = self.outc(x)
+        return logits  
 
 
 
