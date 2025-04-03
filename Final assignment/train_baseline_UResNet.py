@@ -32,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_encode import (ResNet,BasicBlock,Bottleneck)
+from unet_baseline_UResNet import (ResNet,BasicBlock,Bottleneck)
 
 
 # Mapping class IDs to train IDs
@@ -76,27 +76,26 @@ import torch.nn.functional as F
 
 def multiclass_dice_coefficient(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
-
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
-    
     # Ensure target is one-hot encoded and has the same shape as pred
     target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()  # [batch_size, num_classes, height, width]
-
     dice = 0
     for c in range(num_classes):
         pred_c = pred[:, c]  # Extract the prediction for class 'c'
         target_c = target_one_hot[:, c]  # Extract the target for class 'c'
-
-        # Ensure that the shapes match
-        assert pred_c.shape == target_c.shape, f"Shape mismatch: {pred_c.shape} vs {target_c.shape}"
-
         intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over height and width
         union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
-
         dice += (2. * intersection + smooth) / (union + smooth)
-
     return dice.mean() / num_classes
+
+def combined_loss(loss, diceloss, lambda_param=0.5): #larger lambda makes the dominant loss more dominant, balanced at 1
+    exp_ce = torch.exp(lambda_param * loss)
+    exp_dice = torch.exp(lambda_param * diceloss)
+    ce_weight = exp_ce / (exp_ce + exp_dice)
+    dice_weight = exp_dice / (exp_ce + exp_dice)
+
+    return ce_weight * loss + dice_weight * diceloss
 
 def main(args):
     # Initialize wandb for logging
@@ -164,7 +163,6 @@ def main(args):
     model = ResNet(BasicBlock, [2, 2, 2, 2], deep_base=False, num_classes=19)
     #model = ResNet(Bottleneck, [3, 4, 6, 3], deep_base=False, num_classes=19)
     model = model.to(device)
-    print(f"Model is on: {next(model.parameters()).device}")
 
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
@@ -172,7 +170,7 @@ def main(args):
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
-    # Training loop
+# Training loop
     best_valid_loss = float('inf')
     current_best_model_path = None
     for epoch in range(args.epochs):
@@ -188,11 +186,9 @@ def main(args):
             labels = labels.long().squeeze(1)  # Remove channel dimension
 
             optimizer.zero_grad()
-            print(f"Model is on: {next(model.parameters()).device}")
-            print(f"Input tensor is on: {images.device}")
-            print(f"Model weights are on: {model.final_conv.weight.device}")
             outputs = model(images)
-            loss = criterion(outputs, labels)
+            Diceloss = 1- multiclass_dice_coefficient(outputs, labels) 
+            loss = combined_loss(criterion(outputs, labels),Diceloss,1)
             loss.backward()
             optimizer.step()
 
