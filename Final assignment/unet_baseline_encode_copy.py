@@ -184,38 +184,38 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-def forward(self, x):   # (batch_size, 3, 512, 512)
-    print(f"Input shape: {x.shape}")  # (batch_size, 3, 512, 512)
+    def forward(self, x):   # (batch_size, 3, 512, 512)
+        print(f"Input shape: {x.shape}")  # (batch_size, 3, 512, 512)
 
-    x = self.conv1(x)   # (batch_size, 128, 256, 256) if deep_base else (batch_size, 64, 256, 256)
-    print(f"After conv1: {x.shape}")
+        x = self.conv1(x)   # (batch_size, 128, 256, 256) if deep_base else (batch_size, 64, 256, 256)
+        print(f"After conv1: {x.shape}")
 
-    x = self.bn1(x)
-    print(f"After bn1: {x.shape}")
+        x = self.bn1(x)
+        print(f"After bn1: {x.shape}")
 
-    x = self.relu(x)
-    print(f"After relu: {x.shape}")
+        x = self.relu(x)
+        print(f"After relu: {x.shape}")
 
-    x = self.maxpool(x)  # (batch_size, 128, 128, 128) if deep_base else (batch_size, 64, 128, 128)
-    print(f"After maxpool: {x.shape}")
+        x = self.maxpool(x)  # (batch_size, 128, 128, 128) if deep_base else (batch_size, 64, 128, 128)
+        print(f"After maxpool: {x.shape}")
 
-    x = self.layer1(x)  # (batch_size, 64 * expansion, 128, 128)
-    print(f"After layer1: {x.shape}")
+        x = self.layer1(x)  # (batch_size, 64 * expansion, 128, 128)
+        print(f"After layer1: {x.shape}")
 
-    x = self.layer2(x)  # (batch_size, 128 * expansion, 64, 64)
-    print(f"After layer2: {x.shape}")
+        x = self.layer2(x)  # (batch_size, 128 * expansion, 64, 64)
+        print(f"After layer2: {x.shape}")
 
-    x = self.layer3(x)  # (batch_size, 256 * expansion, 64, 64) if dilated else (batch_size, 256 * expansion, 32, 32)
-    print(f"After layer3: {x.shape}")
+        x = self.layer3(x)  # (batch_size, 256 * expansion, 64, 64) if dilated else (batch_size, 256 * expansion, 32, 32)
+        print(f"After layer3: {x.shape}")
 
-    x = self.layer4(x)  # (batch_size, 512 * expansion, 64, 64) if dilated else (batch_size, 512 * expansion, 16, 16)
-    print(f"After layer4: {x.shape}")
+        x = self.layer4(x)  # (batch_size, 512 * expansion, 64, 64) if dilated else (batch_size, 512 * expansion, 16, 16)
+        print(f"After layer4: {x.shape}")
 
-    x = self.segmentation_head(x)   # (batch_size, num_classes, 64, 64) if dilated else (batch_size, num_classes, 16, 16)
-    print(f"After segmentation_head: {x.shape}")
+        x = self.segmentation_head(x)   # (batch_size, num_classes, 64, 64) if dilated else (batch_size, num_classes, 16, 16)
+        print(f"After segmentation_head: {x.shape}")
 
-    x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)  # (batch_size, num_classes, 512, 512)
-    print(f"After interpolation: {x.shape}")
+        x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)  # (batch_size, num_classes, 512, 512)
+        print(f"After interpolation: {x.shape}")
 
-    return x  # (batch_size, num_classes, 512, 512)
+        return x  # (batch_size, num_classes, 512, 512)
 
