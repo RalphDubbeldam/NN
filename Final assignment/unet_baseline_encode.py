@@ -105,12 +105,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-class ResNetSegmentation(nn.Module):
+class ResNet(nn.Module):
     """ResNet adapted for Semantic Segmentation with a fully convolutional output."""
 
     def __init__(self, block, layers, num_classes, dilated=True, multi_grid=False,
                  deep_base=True, norm_layer=nn.BatchNorm2d):
-        super(ResNetSegmentation, self).__init__()
+        super(ResNet, self).__init__()
 
         self.inplanes = 128 if deep_base else 64
         if deep_base:
