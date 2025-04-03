@@ -166,7 +166,7 @@ class ResNet(nn.Module):
         self.upconv2 = self._upconv_block(128, 64)   # Upsample from 128x128 to 256x256
 
         # Final layer to output segmentation map
-        self.final_conv = nn.Conv2d(128, num_classes, kernel_size=1)  # (64 + 64) channels from skip connections
+        self.final_conv = nn.Conv2d(64, num_classes, kernel_size=1)  # (64 + 64) channels from skip connections
 
 
         if dilated:
@@ -245,7 +245,7 @@ class ResNet(nn.Module):
         # Decoder path (upsampling with skip connections)
         x = self.upconv4(x5)              # (batch_size, 256, 64, 64)
         x = self.upconv3(x)               # (batch_size, 128, 128, 128)
-        #x = self.upconv2(x)               # (batch_size, 64, 256, 256)
+        x = self.upconv2(x)               # (batch_size, 64, 256, 256)
         x = self.final_conv(x)            # (batch_size, num_classes, 256, 256)
 
         return x  # (batch_size, num_classes, 256, 256)
