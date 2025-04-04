@@ -15,11 +15,11 @@ test
 """
 import os
 from argparse import ArgumentParser
-
+from PIL import Image, ImageEnhance
 import wandb
-import torch.nn.functional as F
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes, wrap_dataset_for_transforms_v2
@@ -28,12 +28,72 @@ from torchvision.transforms.v2 import (
     Compose,
     Normalize,
     Resize,
-    ToImage,
-    ToDtype,
 )
+from torchvision.transforms.v2.functional import hflip
+from unet_baseline_augm import Model
+import torch
+import torchvision.transforms.functional as Fv
+from torchvision.transforms import (
+    Compose, Resize, Normalize, ToTensor
+)
+import torchvision.transforms.v2.functional as F2
+import random
+import numpy as np
+from transformers import pipeline
 
-from unet_baseline import Model
+class CustomTransform:
+    def __init__(self):
+        self.image_transform = Compose([
+            ToTensor(),
+            Resize((256, 256)),  # Resize image
+            Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
+        ])
+        self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
+        
+    def add_fog(self, img):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
 
+        depth = pipe(img)["depth"]
+        # reduce saturation
+        enhancer = ImageEnhance.Color(img)
+        img_2 = enhancer.enhance(0.6)
+        # reduce brightness
+        enhancer2 = ImageEnhance.Brightness(img_2)
+        img_2 = enhancer2.enhance(0.75)
+        # increase contrast
+        enhancer3 = ImageEnhance.Contrast(img_2)
+        img_2 = enhancer3.enhance(2)
+        # Create a white layer with the same size as the input images
+        white_layer = Image.new('RGBA', img_2.size, (216,216,216,0))
+        # Convert images to numpy arrays for easier manipulation
+        grayscale_array = np.array(depth)
+        white_array = np.array(white_layer)
+        # Set the alpha channel of the white layer
+        white_array[:, :, 3] = 255 - grayscale_array
+        # Convert back to PIL Image
+        white_layer_transparent = Image.fromarray(white_array, 'RGBA')
+        # Composite the images
+        result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
+        return result.convert('RGB')
+
+
+    def __call__(self, img, target):
+        # Apply the same random rotation
+        angle = random.uniform(-10, 10)  # Generate random angle
+        img = Fv.rotate(img, angle)  
+        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
+        # Apply horizontal flip for 50 percent
+        if torch.rand(1) < 0.5:
+            img = F2.hflip(img)
+            target = F2.hflip(target)
+        # Apply fog to 10 percent of images
+        if torch.rand(1) < 0.1:
+            img = self.add_fog(img)        
+        img = self.image_transform(img)
+        target = self.label_transform(target)
+        target = target.to(torch.long)  # Ensure labels are integers
+        return img, target
 
 # Mapping class IDs to train IDs
 id_to_trainid = {cls.id: cls.train_id for cls in Cityscapes.classes}
@@ -71,32 +131,25 @@ def get_args_parser():
     return parser
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
-import torch
-import torch.nn.functional as F
-
 def multiclass_dice_coefficient(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
 
     num_classes = pred.shape[1]
     target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
-    
-    # Ensure target is one-hot encoded and has the same shape as pred
-    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()  # [batch_size, num_classes, height, width]
+    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()
 
     dice = 0
     for c in range(num_classes):
-        pred_c = pred[:, c]  # Extract the prediction for class 'c'
-        target_c = target_one_hot[:, c]  # Extract the target for class 'c'
+        pred_c = pred[:, c].clone()  # Clone to prevent in-place modification
+        target_c = target_one_hot[:, c]
 
-        # Ensure that the shapes match
-        assert pred_c.shape == target_c.shape, f"Shape mismatch: {pred_c.shape} vs {target_c.shape}"
-
-        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over height and width
+        intersection = (pred_c * target_c).sum(dim=(1, 2))
         union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
 
         dice += (2. * intersection + smooth) / (union + smooth)
 
     return dice.mean() / num_classes
+
 
 def main(args):
     # Initialize wandb for logging
@@ -120,12 +173,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    transform = Compose([
-        ToImage(),
-        Resize((256, 256)),
-        ToDtype(torch.float32, scale=True),
-        Normalize((0.5,), (0.5,)),
-    ])
+    transform = CustomTransform()
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
@@ -209,11 +257,12 @@ def main(args):
                 images, labels = images.to(device), labels.to(device)
 
                 labels = labels.long().squeeze(1)  # Remove channel dimension
+
                 outputs = model(images)
-                Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
-                Dices.append(Dice)
                 loss = criterion(outputs, labels)
+                Dice = multiclass_dice_coefficient(outputs, labels)  # Compute Dice Loss
                 losses.append(loss.item())
+                Dices.append(Dice)
             
                 if i == 0:
                     predictions = outputs.softmax(1).argmax(1)
@@ -239,7 +288,7 @@ def main(args):
             valid_Dice = sum(Dices) / len(Dices)
             wandb.log({
                 "valid_loss": valid_loss,
-                "valid_DiceCoefficient": valid_Dice,
+                "valid_DiceCoefficient": valid_Dice
             }, step=(epoch + 1) * len(train_dataloader) - 1)
 
             if valid_loss < best_valid_loss:
