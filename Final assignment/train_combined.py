@@ -14,15 +14,21 @@ Feel free to customize the script as needed for your use case.
 test
 """
 import os
-from argparse import ArgumentParser
 import wandb
+import random
 import torch.nn.functional as F
+import torchvision.transforms.functional as Fv
+import torchvision.transforms.v2.functional as F2
 import torch
 import torch.nn as nn
+import numpy as np
+from argparse import ArgumentParser
+from PIL import Image, ImageEnhance
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes, wrap_dataset_for_transforms_v2
 from torchvision.utils import make_grid
+from transformers import pipeline
 from torchvision.transforms.v2 import (
     Compose,
     Normalize,
@@ -30,8 +36,88 @@ from torchvision.transforms.v2 import (
     ToImage,
     ToDtype,
 )
-
+from torchvision.transforms import (
+    Compose, 
+    Resize, 
+    Normalize, 
+    ToTensor
+)
 from unet_combined import Model
+
+class CustomTransform:
+    def __init__(self):
+        self.image_transform = Compose([
+            ToTensor(),
+            Resize((256, 256)),  # Resize image
+            Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
+        ])
+        self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
+
+    def add_fog(self, img):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
+
+        depth = pipe(img)["depth"]
+        # reduce saturation
+        enhancer = ImageEnhance.Color(img)
+        img_2 = enhancer.enhance(0.6)
+        # reduce brightness
+        enhancer2 = ImageEnhance.Brightness(img_2)
+        img_2 = enhancer2.enhance(0.75)
+        # increase contrast
+        enhancer3 = ImageEnhance.Contrast(img_2)
+        img_2 = enhancer3.enhance(2)
+        # Create a white layer with the same size as the input images
+        white_layer = Image.new('RGBA', img_2.size, (216,216,216,0))
+        # Convert images to numpy arrays for easier manipulation
+        grayscale_array = np.array(depth)
+        white_array = np.array(white_layer)
+        # Set the alpha channel of the white layer
+        white_array[:, :, 3] = 255 - grayscale_array
+        # Convert back to PIL Image
+        white_layer_transparent = Image.fromarray(white_array, 'RGBA')
+        # Composite the images
+        result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
+        return result.convert('RGB')
+    
+    def add_night(self,img):
+        # Reduce brightness (make it darker)
+        enhancer = ImageEnhance.Brightness(img)
+        img_night = enhancer.enhance(0.5)  # Lower brightness significantly
+        # Add a blue tint (simulate moonlight)
+        img_array = np.array(img_night).astype(np.float32)  # Convert to float for operations
+        img_array[:, :, 0] *= 0.7  # Reduce red channel
+        img_array[:, :, 1] *= 0.8  # Reduce green channel
+        img_array[:, :, 2] *= 1.15  # Boost blue channel
+        # Clip values to valid range (0-255)
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+        # Convert back to an image
+        img_night = Image.fromarray(img_array)
+        # Increase contrast to make artificial lights stand out
+        enhancer = ImageEnhance.Contrast(img_night)
+        img_night = enhancer.enhance(1.5)  # Adjust contrast
+
+        return img_night
+
+    def __call__(self, img, target):
+        # Apply the same random rotation
+        angle = random.uniform(-10, 10)  # Generate random angle
+        img = Fv.rotate(img, angle)  
+        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
+        # Apply horizontal flip 50% of the time
+        if torch.rand(1) < 0.5:
+            img = F2.hflip(img)
+            target = F2.hflip(target)
+        # Apply fog 10% of the time
+        if torch.rand(1) < 0.1:
+            img = self.add_fog(img)
+        # Apply night 20% of the time
+        if torch.rand(1) < 0.2:
+            img = self.add_night(img)
+        img = self.image_transform(img)
+        target = self.label_transform(target)
+        target = target.to(torch.long)  # Ensure labels are integers
+        return img, target
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
 def multiclass_dice_coefficient(pred, target, smooth=1):
@@ -114,12 +200,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    transform = Compose([
-        ToImage(),
-        Resize((256, 256)),
-        ToDtype(torch.float32, scale=True),
-        Normalize((0.5,), (0.5,)),
-    ])
+    transform = CustomTransform()
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
