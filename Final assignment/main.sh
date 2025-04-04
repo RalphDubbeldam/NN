@@ -1,6 +1,6 @@
 wandb login
 
-python3 train_baseline_UResNet.py \
+python3 train_baseline_augm.py \
     --data-dir ./data/cityscapes \
     --batch-size 64 \
     --epochs 100 \
