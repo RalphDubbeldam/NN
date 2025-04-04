@@ -1,5 +1,9 @@
 import torch
 import torch.nn as nn
+from torchvision import transforms
+from transformers import pipeline
+from PIL import Image
+
 
 class Model(nn.Module):
     """ 
@@ -8,10 +12,18 @@ class Model(nn.Module):
     Olaf Ronneberger et al. (2015), "U-Net: Convolutional Networks for Biomedical Image Segmentation"
     https://arxiv.org/pdf/1505.04597.pdf
     """
-    def __init__(self, in_channels=3, n_classes=16):
+    def __init__(self, in_channels=4, n_classes=16):
         
         super(Model, self).__init__()
-
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.pipe = pipeline(
+            task="depth-estimation",
+            model="depth-anything/Depth-Anything-V2-Base-hf",
+            device=0 if self.device.type == "cuda" else -1,
+            use_fast=True,
+        )
+        self.to_pil = transforms.ToPILImage()
+        self.to_tensor = transforms.ToTensor()
         self.inc = (DoubleConv(in_channels, 64))
         self.down1 = (Down(64, 128))
         self.down2 = (Down(128, 256))
@@ -23,7 +35,22 @@ class Model(nn.Module):
         self.up4 = (Up(128, 64))
         self.outc = (OutConv(64, n_classes))
 
+    def add_depth(self, imgs):
+        """Estimate depth for each image and concatenate as an additional channel."""
+        b, c, h, w = imgs.size()
+        depth_channels = []
+        for img in imgs:
+            pil_img = self.to_pil(img.cpu())
+            depth_map = self.pipe(pil_img)["depth"]
+            depth_tensor = self.to_tensor(depth_map).to(self.device)
+            depth_tensor = nn.functional.interpolate(depth_tensor.unsqueeze(0), size=(h, w), mode="bilinear", align_corners=False)
+            depth_channels.append(depth_tensor.squeeze(0))  # shape: [1, H, W]
+
+        depth = torch.stack(depth_channels)  # shape: [B, 1, H, W]
+        return torch.cat((imgs, depth), dim=1)  # shape: [B, 4, H, W]
+
     def forward(self, x):
+        x = self.add_depth(x)
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -36,7 +63,6 @@ class Model(nn.Module):
         logits = self.outc(x)
 
         return logits
-        
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
