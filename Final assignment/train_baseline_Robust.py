@@ -51,6 +51,33 @@ class CustomTransform:
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
 
+    def add_fog(self, img):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
+
+        depth = pipe(img)["depth"]
+        # reduce saturation
+        enhancer = ImageEnhance.Color(img)
+        img_2 = enhancer.enhance(0.6)
+        # reduce brightness
+        enhancer2 = ImageEnhance.Brightness(img_2)
+        img_2 = enhancer2.enhance(0.75)
+        # increase contrast
+        enhancer3 = ImageEnhance.Contrast(img_2)
+        img_2 = enhancer3.enhance(2)
+        # Create a white layer with the same size as the input images
+        white_layer = Image.new('RGBA', img_2.size, (216,216,216,0))
+        # Convert images to numpy arrays for easier manipulation
+        grayscale_array = np.array(depth)
+        white_array = np.array(white_layer)
+        # Set the alpha channel of the white layer
+        white_array[:, :, 3] = 255 - grayscale_array
+        # Convert back to PIL Image
+        white_layer_transparent = Image.fromarray(white_array, 'RGBA')
+        # Composite the images
+        result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
+        return result.convert('RGB')
+
     def __call__(self, img, target):
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
@@ -60,6 +87,8 @@ class CustomTransform:
         if torch.rand(1) < 0.5:
             img = F2.hflip(img)
             target = F2.hflip(target)
+        if torch.rand(1) < -0.5:
+            img = self.add_fog(img)
         img = self.image_transform(img)
         target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
