@@ -105,14 +105,14 @@ class CustomTransform:
         img = Fv.rotate(img, angle)  
         target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
         # Apply horizontal flip 50% of the time
-        if torch.rand(1) < 0.5:
+        if torch.rand(1) < -0.5:
             img = F2.hflip(img)
             target = F2.hflip(target)
         # Apply fog 10% of the time
         if torch.rand(1) < -0.1:
             img = self.add_fog(img)
         # Apply night 20% of the time
-        if torch.rand(1) < 0.2:
+        if torch.rand(1) < -0.2:
             img = self.add_night(img)
         img = self.image_transform(img)
         target = self.label_transform(target)
