@@ -87,7 +87,7 @@ class CustomTransform:
         if torch.rand(1) < 0.5:
             img = F2.hflip(img)
             target = F2.hflip(target)
-        if torch.rand(1) < -0.5:
+        if torch.rand(1) < 0.1:
             img = self.add_fog(img)
         img = self.image_transform(img)
         target = self.label_transform(target)
