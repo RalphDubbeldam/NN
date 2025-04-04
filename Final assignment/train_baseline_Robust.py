@@ -89,7 +89,7 @@ class CustomTransform:
             img = F2.hflip(img)
             target = F2.hflip(target)
         # Apply fog to 10 percent of images
-        if torch.rand(1) < 0.1:
+        if torch.rand(1) < -0.1:
             img = self.add_fog(img)        
         img = self.image_transform(img)
         target = self.label_transform(target)
