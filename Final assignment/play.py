@@ -41,7 +41,7 @@ class CustomTransform:
         white_layer_transparent = Image.fromarray(white_array, 'RGBA')
         # Composite the images
         result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
-        return result.convert('RGB')
+        return depth #result.convert('RGB')
 
     def add_night(self,img):
         """
