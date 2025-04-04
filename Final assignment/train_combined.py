@@ -55,7 +55,7 @@ class CustomTransform:
 
     def add_fog(self, img):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", use_fast=True)
 
         depth = pipe(img)["depth"]
         # reduce saturation
