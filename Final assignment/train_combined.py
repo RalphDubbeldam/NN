@@ -15,6 +15,7 @@ test
 """
 import os
 from argparse import ArgumentParser
+
 import wandb
 import torch.nn.functional as F
 import torch
@@ -31,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_3D import Model
+from unet_baseline import Model
 
 
 # Mapping class IDs to train IDs
@@ -160,7 +161,7 @@ def main(args):
 
     # Define the model
     model = Model(
-        in_channels=4,  # RGBD images
+        in_channels=3,  # RGB images
         n_classes=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
 
@@ -182,7 +183,9 @@ def main(args):
 
             labels = convert_to_train_id(labels)  # Convert class IDs to train IDs
             images, labels = images.to(device), labels.to(device)
+
             labels = labels.long().squeeze(1)  # Remove channel dimension
+
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
