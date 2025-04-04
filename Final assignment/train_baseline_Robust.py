@@ -77,18 +77,41 @@ class CustomTransform:
         # Composite the images
         result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
         return result.convert('RGB')
+    
+    def add_night(self,img):
+        # Reduce brightness (make it darker)
+        enhancer = ImageEnhance.Brightness(img)
+        img_night = enhancer.enhance(0.5)  # Lower brightness significantly
+        # Add a blue tint (simulate moonlight)
+        img_array = np.array(img_night).astype(np.float32)  # Convert to float for operations
+        img_array[:, :, 0] *= 0.7  # Reduce red channel
+        img_array[:, :, 1] *= 0.8  # Reduce green channel
+        img_array[:, :, 2] *= 1.15  # Boost blue channel
+        # Clip values to valid range (0-255)
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+        # Convert back to an image
+        img_night = Image.fromarray(img_array)
+        # Increase contrast to make artificial lights stand out
+        enhancer = ImageEnhance.Contrast(img_night)
+        img_night = enhancer.enhance(1.5)  # Adjust contrast
+
+        return img_night
 
     def __call__(self, img, target):
         # Apply the same random rotation
         angle = random.uniform(-10, 10)  # Generate random angle
         img = Fv.rotate(img, angle)  
         target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
-        # Apply horizontal flip manually (for label consistency)
+        # Apply horizontal flip 50% of the time
         if torch.rand(1) < 0.5:
             img = F2.hflip(img)
             target = F2.hflip(target)
+        # Apply fog 10% of the time
         if torch.rand(1) < 0.1:
             img = self.add_fog(img)
+        # Apply night 20% of the time
+        if torch.rand(1) < 0.2:
+            img = self.add_night(img)
         img = self.image_transform(img)
         target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
