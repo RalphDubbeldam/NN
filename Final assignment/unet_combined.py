@@ -12,7 +12,7 @@ class Model(nn.Module):
     Olaf Ronneberger et al. (2015), "U-Net: Convolutional Networks for Biomedical Image Segmentation"
     https://arxiv.org/pdf/1505.04597.pdf
     """
-    def __init__(self, in_channels=4, n_classes=16):
+    def __init__(self, in_channels=3, n_classes=19):
         
         super(Model, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -50,7 +50,7 @@ class Model(nn.Module):
         return torch.cat((imgs, depth), dim=1)  # shape: [B, 4, H, W]
 
     def forward(self, x):
-        x = self.add_depth(x)
+        #x = self.add_depth(x)
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)

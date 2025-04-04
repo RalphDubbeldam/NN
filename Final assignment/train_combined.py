@@ -33,6 +33,7 @@ from torchvision.transforms.v2 import (
 
 from unet_combined import Model
 
+#https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
 def multiclass_dice_coefficient(pred, target, smooth=1):
     pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
     num_classes = pred.shape[1]
@@ -90,34 +91,6 @@ def get_args_parser():
     parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
 
     return parser
-
-#https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
-import torch
-import torch.nn.functional as F
-
-def multiclass_dice_coefficient(pred, target, smooth=1):
-    pred = F.softmax(pred.clone(), dim=1)  # Clone to avoid modifying original tensor
-
-    num_classes = pred.shape[1]
-    target = torch.clamp(target, min=0, max=num_classes - 1)  # Avoid invalid indices
-    
-    # Ensure target is one-hot encoded and has the same shape as pred
-    target_one_hot = F.one_hot(target, num_classes=num_classes).permute(0, 3, 1, 2).float()  # [batch_size, num_classes, height, width]
-
-    dice = 0
-    for c in range(num_classes):
-        pred_c = pred[:, c]  # Extract the prediction for class 'c'
-        target_c = target_one_hot[:, c]  # Extract the target for class 'c'
-
-        # Ensure that the shapes match
-        assert pred_c.shape == target_c.shape, f"Shape mismatch: {pred_c.shape} vs {target_c.shape}"
-
-        intersection = (pred_c * target_c).sum(dim=(1, 2))  # Sum over height and width
-        union = pred_c.sum(dim=(1, 2)) + target_c.sum(dim=(1, 2))
-
-        dice += (2. * intersection + smooth) / (union + smooth)
-
-    return dice.mean() / num_classes
 
 def main(args):
     # Initialize wandb for logging
@@ -182,7 +155,7 @@ def main(args):
 
     # Define the model
     model = Model(
-        in_channels=4,  # RGBD images
+        in_channels=3,  # RGBD images
         n_classes=19,  # 19 classes in the Cityscapes dataset
     ).to(device)
 
@@ -209,7 +182,7 @@ def main(args):
 
             optimizer.zero_grad()
             outputs = model(images)
-            loss = combined_loss(criterion(outputs, labels),multiclass_dice_coefficient(outputs,labels),1)
+            loss = combined_loss(criterion(outputs, labels),1-multiclass_dice_coefficient(outputs,labels),1)
             loss.backward()
             optimizer.step()
 
