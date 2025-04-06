@@ -14,13 +14,13 @@ class Model(nn.Module):
     def __init__(self, in_channels=4, n_classes=19):
         
         super(Model, self).__init__()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.pipe = pipeline(
-            task="depth-estimation",
-            model="depth-anything/Depth-Anything-V2-Base-hf",
-            device=0 if self.device.type == "cuda" else -1,
-            use_fast=True,
-        )
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.pipe = pipeline(
+        #    task="depth-estimation",
+        #    model="depth-anything/Depth-Anything-V2-Base-hf",
+        #    device=0 if self.device.type == "cuda" else -1,
+        #    use_fast=True,
+        #)
         self.to_pil = transforms.ToPILImage()
         self.to_tensor = transforms.ToTensor()
         self.inc = (DoubleConv(in_channels, 64))
