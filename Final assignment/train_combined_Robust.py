@@ -109,7 +109,7 @@ class CustomTransform:
             img = F2.hflip(img)
             target = F2.hflip(target)
         # Apply fog 10% of the time
-        if torch.rand(1) < -0.1:
+        if torch.rand(1) < 0.1:
             img = self.add_fog(img)
         # Apply night 20% of the time
         if torch.rand(1) < 0.2:
