@@ -52,13 +52,12 @@ class CustomTransform:
             Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
+        self.pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0 if self.device.type == "cuda" else -1,use_fast=True)
 
     def add_fog(self, img):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
-        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0 if device.type == "cuda" else -1,use_fast=True)
-
-        depth = pipe(img)["depth"]
+        depth = self.pipe(img)["depth"]
         # reduce saturation
         enhancer = ImageEnhance.Color(img)
         img_2 = enhancer.enhance(0.6)
