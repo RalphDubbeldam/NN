@@ -41,7 +41,7 @@ class CustomTransform:
         white_layer_transparent = Image.fromarray(white_array, 'RGBA')
         # Composite the images
         result = Image.alpha_composite(img_2.convert('RGBA'), white_layer_transparent)
-        return depth #result.convert('RGB')
+        return result.convert('RGB')
 
     def add_night(self,img):
         """
@@ -80,23 +80,23 @@ class CustomTransform:
         return img
 
 def visualize_transform(original_img, fog_img, night_img):
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 1, figsize=(15, 5))
     original_img = np.array(original_img)
     fog_img = fog_img.permute(1, 2, 0).numpy()  #
     night_img = night_img.permute(1, 2, 0).numpy()  #
 
     # Convert images to numpy for display
-    axes[0].imshow(np.array(original_img))
-    axes[0].set_title("Original Image")
-    axes[0].axis('off')
+    axes.imshow(np.array(night_img))
+    axes.set_title("Night Image")
+    axes.axis('off')
 
-    axes[1].imshow(np.array(fog_img))
-    axes[1].set_title("Fog Effect")
-    axes[1].axis('off')
+    #axes[1].imshow(np.array(fog_img))
+    #axes[1].set_title("Fog Effect")
+    #axes[1].axis('off')
 
-    axes[2].imshow(np.array(night_img))
-    axes[2].set_title("Night Effect")
-    axes[2].axis('off')
+    #axes[2].imshow(np.array(night_img))
+    #axes[2].set_title("Night Effect")
+    #axes[2].axis('off')
 
     plt.show()
 
