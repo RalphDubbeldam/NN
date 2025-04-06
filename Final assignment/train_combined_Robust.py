@@ -180,6 +180,7 @@ def get_args_parser():
     parser.add_argument("--num-workers", type=int, default=10, help="Number of workers for data loaders")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
+    parser.add_argument("--poly-power", type=float, default=0.9, help="Power for the poly learning rate schedule")
 
     return parser
 
@@ -210,7 +211,7 @@ def main(args):
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
-        args.data_dir, 
+        args.data_dir,
         split="train", 
         mode="fine", 
         target_type="semantic", 
@@ -251,6 +252,11 @@ def main(args):
 
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
+    # Define the scheduler (Poly LR)
+    total_iters = args.epochs * len(train_dataloader)
+    def poly_lr_lambda(current_iter):
+        return (1 - current_iter / total_iters) ** args.poly_power
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=poly_lr_lambda)
 
     # Training loop
     best_valid_loss = float('inf')
@@ -272,6 +278,7 @@ def main(args):
             loss = combined_loss(criterion(outputs, labels),1-multiclass_dice_coefficient(outputs,labels),1)
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             wandb.log({
                 "train_loss": loss.item(),

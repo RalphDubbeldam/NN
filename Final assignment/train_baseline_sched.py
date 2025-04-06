@@ -69,7 +69,6 @@ def get_args_parser():
     parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
     parser.add_argument("--poly-power", type=float, default=0.9, help="Power for the poly learning rate schedule")
 
-
     return parser
 
 #https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
