@@ -45,14 +45,16 @@ from torchvision.transforms import (
 from unet_combined_Robust import Model
 
 class CustomTransform:
-    def __init__(self, pipe):
+    def __init__(self):
         self.image_transform = Compose([
             ToTensor(),
             Resize((256, 256)),  # Resize image
             Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),  # Normalize for RGB
         ])
         self.label_transform = Resize((256, 256), interpolation=Fv.InterpolationMode.NEAREST)
-        self.pipe=pipe
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
+        self.pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0 if self.device.type == "cuda" else -1,use_fast=True)
 
     def add_fog(self, img):
         depth = self.pipe(img)["depth"]
@@ -198,9 +200,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    #pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
-    pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0 if device.type == "cuda" else -1,use_fast=True)
-    transform = CustomTransform(pipe)
+    transform = CustomTransform()
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
