@@ -42,6 +42,9 @@ from torchvision.transforms import (
     Normalize, 
     ToTensor
 )
+import multiprocessing as mp
+mp.set_start_method('spawn', force=True)
+
 from unet_combined_Robust import Model
 
 class CustomTransform:
