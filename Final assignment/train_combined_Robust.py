@@ -200,7 +200,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    transform = CustomTransform("train")
+    transform = CustomTransform()
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
