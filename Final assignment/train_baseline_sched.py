@@ -197,7 +197,7 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(images)
             Diceloss = 1- multiclass_dice_coefficient(outputs, labels) 
-            loss = combined_loss(criterion(outputs, labels),Diceloss,1)
+            loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             scheduler.step()
