@@ -32,7 +32,7 @@ from torchvision.transforms.v2 import (
     ToDtype,
 )
 
-from unet_baseline_UResNet import (ResNet,BasicBlock,Bottleneck)
+from unet_baseline_loss import Model
 
 
 # Mapping class IDs to train IDs
@@ -67,6 +67,8 @@ def get_args_parser():
     parser.add_argument("--num-workers", type=int, default=10, help="Number of workers for data loaders")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--experiment-id", type=str, default="unet-training", help="Experiment ID for Weights & Biases")
+    parser.add_argument("--poly-power", type=float, default=0.9, help="Power for the poly learning rate schedule")
+
 
     return parser
 
@@ -159,18 +161,26 @@ def main(args):
     )
 
     # Define the model
-    # Initialize the ResNet-18 model
-    model = ResNet(BasicBlock, [2, 2, 2, 2], deep_base=False, num_classes=19)
-    #model = ResNet(Bottleneck, [3, 4, 6, 3], deep_base=False, num_classes=19)
-    model = model.to(device)
+    model = Model(
+        in_channels=3,  # RGB images
+        n_classes=19,  # 19 classes in the Cityscapes dataset
+    ).to(device)
 
     # Define the loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # Ignore the void class
 
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
+    # Define the scheduler (Poly LR)
+    total_iters = args.epochs * len(train_dataloader)
 
-# Training loop
+    def poly_lr_lambda(current_iter):
+        return (1 - current_iter / total_iters) ** args.poly_power
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=poly_lr_lambda)
+
+
+    # Training loop
     best_valid_loss = float('inf')
     current_best_model_path = None
     for epoch in range(args.epochs):
@@ -191,6 +201,7 @@ def main(args):
             loss = combined_loss(criterion(outputs, labels),Diceloss,1)
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             wandb.log({
                 "train_loss": loss.item(),
