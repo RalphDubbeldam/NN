@@ -252,11 +252,6 @@ def main(args):
 
     # Define the optimizer
     optimizer = AdamW(model.parameters(), lr=args.lr)
-    # Define the scheduler (Poly LR)
-    total_iters = args.epochs * len(train_dataloader)
-    def poly_lr_lambda(current_iter):
-        return (1 - current_iter / total_iters) ** args.poly_power
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=poly_lr_lambda)
 
     # Training loop
     best_valid_loss = float('inf')
@@ -278,7 +273,6 @@ def main(args):
             loss = combined_loss(criterion(outputs, labels),1-multiclass_dice_coefficient(outputs,labels),1)
             loss.backward()
             optimizer.step()
-            scheduler.step()
 
             wandb.log({
                 "train_loss": loss.item(),
