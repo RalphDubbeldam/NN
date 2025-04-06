@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 from transformers import pipeline
-from PIL import Image
 
 
 class Model(nn.Module):
