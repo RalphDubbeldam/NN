@@ -48,7 +48,7 @@ mp.set_start_method('spawn', force=True)
 from unet_combined_Robust import Model
 
 class CustomTransform:
-    def __init__(self):
+    def __init__(self,mode):
         self.image_transform = Compose([
             ToTensor(),
             Resize((256, 256)),  # Resize image
@@ -58,6 +58,7 @@ class CustomTransform:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         #pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=device, use_fast=True)
         self.pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0 if self.device.type == "cuda" else -1,use_fast=True)
+        self.mode=mode
 
     def add_fog(self, img):
         depth = self.pipe(img)["depth"]
@@ -103,20 +104,21 @@ class CustomTransform:
         return img_night
 
     def __call__(self, img, target):
-        # Apply the same random rotation
-        angle = random.uniform(-10, 10)  # Generate random angle
-        img = Fv.rotate(img, angle)  
-        target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
-        # Apply horizontal flip 50% of the time
-        if torch.rand(1) < 0.5:
-            img = F2.hflip(img)
-            target = F2.hflip(target)
-        # Apply fog 10% of the time
-        if torch.rand(1) < 0.1:
-            img = self.add_fog(img)
-        # Apply night 20% of the time
-        if torch.rand(1) < 0.2:
-            img = self.add_night(img)
+        if self.mode=="train":
+            # Apply the same random rotation
+            angle = random.uniform(-10, 10)  # Generate random angle
+            img = Fv.rotate(img, angle)  
+            target = Fv.rotate(target, angle, interpolation=Fv.InterpolationMode.NEAREST)  
+            # Apply horizontal flip 50% of the time
+            if torch.rand(1) < 0.5:
+                img = F2.hflip(img)
+                target = F2.hflip(target)
+            # Apply fog 10% of the time
+            if torch.rand(1) < 0.1:
+                img = self.add_fog(img)
+            # Apply night 20% of the time
+            if torch.rand(1) < 0.2:
+                img = self.add_night(img)
         img = self.image_transform(img)
         target = self.label_transform(target)
         target = target.to(torch.long)  # Ensure labels are integers
@@ -203,7 +205,8 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transforms to apply to the data
-    transform = CustomTransform()
+    transformTrain = CustomTransform("train")
+    transformVal = CustomTransform("val")
 
     # Load the dataset and make a split for training and validation
     train_dataset = Cityscapes(
@@ -211,14 +214,14 @@ def main(args):
         split="train", 
         mode="fine", 
         target_type="semantic", 
-        transforms=transform
+        transforms=transformTrain
     )
     valid_dataset = Cityscapes(
         args.data_dir, 
         split="val", 
         mode="fine", 
         target_type="semantic", 
-        transforms=transform
+        transforms=transformVal
     )
 
     train_dataset = wrap_dataset_for_transforms_v2(train_dataset)
