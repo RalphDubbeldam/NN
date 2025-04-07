@@ -24,7 +24,7 @@ class Model(nn.Module):
         )
         self.to_pil = transforms.ToPILImage()
         self.to_tensor = transforms.ToTensor()
-        self.inc = (DoubleConv(in_channels, 64))
+        self.inc = (DoubleConv(4, 64))
         self.down1 = (Down(64, 128))
         self.down2 = (Down(128, 256))
         self.down3 = (Down(256, 512))
