@@ -1,3 +1,0 @@
-[submodule "3rdparty/weather-particle-simulator"]
-	path = 3rdparty/weather-particle-simulator
-	url = git@github.com:cv-rits/weather-particle-simulator.git
